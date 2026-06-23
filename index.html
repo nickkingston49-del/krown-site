@@ -523,4 +523,12 @@
       '\nEmail: ' + (data.email || '-') + '\nService: ' + (data.service || '-') +
       '\nCity/ZIP: ' + (data.city || '-') + '\n\nDetails:\n' + (data.message || '-')
     );
-    window.location.href = 'mailto:' 
+    window.location.href = 'mailto:' + KROWN_CONFIG.FALLBACK_EMAIL +
+      '?subject=' + encodeURIComponent('Estimate Request — ' + data.name) + '&body=' + body;
+    btn.disabled = false; btn.textContent = 'Send My Request';
+    show('ok', 'Opening your email app to finish sending. Or just call (409) 719-2053.');
+  });
+})();
+</script>
+</body>
+</html>
