@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Krown CRM — Lead Pipeline</title>
+<link rel="icon" type="image/png" href="assets/logo.webp">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --blue:#2d4cb3;--blue-700:#26409a;--navy:#101d49;--gold:#ffd700;--charcoal:#242424;
+  --ink:#1b2030;--slate:#5d6573;--line:#e7eaf3;--soft:#f4f7fd;--bg:#eef1f8;
+  --new:#2d4cb3;--contacted:#8a5cf6;--quoted:#e0a400;--won:#1f9d5b;--lost:#9aa3b2;
+  --radius:12px;--shadow:0 8px 24px rgba(16,29,73,.10);
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Poppins",system-ui,sans-serif;background:var(--bg);color:var(--ink);line-height:1.5}
+button{font-family:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit}
+a{color:var(--blue)}
+
+/* ---- Login ---- */
+.login-wrap{min-height:100vh;display:grid;place-items:center;padding:24px;
+  background:linear-gradient(160deg,var(--navy),var(--blue-700))}
+.login-card{background:#fff;border-radius:18px;box-shadow:var(--shadow);padding:38px 34px;width:100%;max-width:400px;text-align:center}
+.login-card img{height:64px;margin:0 auto 10px}
+.login-card h1{font-size:1.35rem;margin:0 0 4px}
+.login-card p{color:var(--slate);font-size:.92rem;margin:0 0 24px}
+.fld{text-align:left;margin-bottom:16px}
+.fld label{display:block;font-size:.82rem;font-weight:600;margin-bottom:6px}
+.fld input{width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;font-size:1rem;background:#fcfcfe}
+.fld input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(45,76,179,.12)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:10px;
+  font-weight:600;font-size:.97rem;padding:12px 18px;transition:.15s}
+.btn-primary{background:var(--blue);color:#fff;width:100%}
+.btn-primary:hover{background:var(--blue-700)}
+.btn-primary:disabled{opacity:.6;cursor:default}
+.msg{font-size:.88rem;padding:10px 12px;border-radius:8px;margin-bottom:14px;display:none}
+.msg.err{display:block;background:rgba(200,50,50,.08);color:#a12727}
+.msg.ok{display:block;background:rgba(31,157,91,.1);color:#1c6b40}
+.hint{font-size:.78rem;color:var(--slate);margin-top:14px;line-height:1.5}
+
+/* ---- App ---- */
+.app{display:none}
+.topbar{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+.topbar-inner{max-width:1320px;margin:0 auto;padding:12px 22px;display:flex;align-items:center;gap:16px;justify-content:space-between}
+.topbar .brand{display:flex;align-items:center;gap:10px}
+.topbar .brand img{height:40px}
+.topbar .brand b{font-size:1.05rem}
+.topbar-actions{display:flex;align-items:center;gap:10px}
+.icon-btn{background:var(--soft);border:1px solid var(--line);border-radius:9px;padding:9px 14px;font-weight:600;font-size:.88rem;color:var(--ink)}
+.icon-btn:hover{border-color:var(--blue);color:var(--blue)}
+.who{font-size:.82rem;color:var(--slate)}
+
+.stats{max-width:1320px;margin:0 auto;padding:22px 22px 6px;display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+.stat{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px}
+.stat .n{font-size:1.7rem;font-weight:800;line-height:1}
+.stat .l{font-size:.8rem;color:var(--slate);margin-top:4px;text-transform:uppercase;letter-spacing:.05em}
+.stat.b-new .n{color:var(--new)} .stat.b-won .n{color:var(--won)} .stat.b-week .n{color:var(--quoted)}
+
+.toolbar{max-width:1320px;margin:0 auto;padding:14px 22px;display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.search{flex:1;min-width:200px;padding:10px 14px;border:1.5px solid var(--line);border-radius:10px;background:#fff;font-size:.95rem}
+.search:focus{outline:none;border-color:var(--blue)}
+
+.board{max-width:1320px;margin:0 auto;padding:6px 22px 60px;display:grid;grid-template-columns:repeat(5,1fr);gap:14px;align-items:start}
+.col{background:#fff;border:1px solid var(--line);border-radius:var(--radius);min-height:120px}
+.col-head{padding:13px 15px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0}
+.col-head .dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:8px}
+.col-head b{font-size:.9rem}
+.col-head .count{background:var(--soft);border-radius:20px;padding:2px 9px;font-size:.78rem;font-weight:700;color:var(--slate)}
+.col-body{padding:12px;display:flex;flex-direction:column;gap:11px;min-height:60px}
+.col.drag-over{outline:2px dashed var(--blue);outline-offset:-4px}
+
+.card{background:#fff;border:1px solid var(--line);border-radius:11px;padding:13px 14px;box-shadow:0 2px 8px rgba(16,29,73,.05);cursor:grab}
+.card:active{cursor:grabbing}
+.card .cname{font-weight:700;font-size:.97rem;display:flex;justify-content:space-between;gap:8px;align-items:center}
+.card .csvc{font-size:.82rem;color:var(--blue);font-weight:600;margin-top:2px}
+.card .cmeta{font-size:.8rem;color:var(--slate);margin-top:7px;display:flex;flex-direction:column;gap:3px}
+.card .cmeta a{color:var(--slate);text-decoration:none}
+.card .cmeta a:hover{color:var(--blue)}
+.card .cmsg{font-size:.82rem;color:#3a4150;margin-top:8px;background:var(--soft);padding:8px 10px;border-radius:7px;max-height:64px;overflow:hidden}
+.card .cfoot{display:flex;gap:6px;margin-top:10px}
+.card .mini{flex:1;background:var(--soft);border:1px solid var(--line);border-radius:7px;padding:6px;font-size:.78rem;font-weight:600;color:var(--ink);text-align:center;text-decoration:none}
+.card .mini:hover{border-color:var(--blue);color:var(--blue)}
+.card .cdate{font-size:.72rem;color:#9aa3b2;font-weight:500}
+
+.empty{max-width:1320px;margin:40px auto;text-align:center;color:var(--slate);padding:40px}
+.empty b{display:block;font-size:1.1rem;color:var(--ink);margin-bottom:6px}
+
+/* modal */
+.modal-bg{position:fixed;inset:0;background:rgba(8,14,38,.55);display:none;place-items:center;z-index:50;padding:20px}
+.modal-bg.open{display:grid}
+.modal{background:#fff;border-radius:16px;box-shadow:var(--shadow);width:100%;max-width:460px;padding:26px;max-height:90vh;overflow:auto}
+.modal h3{margin:0 0 16px}
+.modal .fld textarea{width:100%;padding:11px 13px;border:1.5px solid var(--line);border-radius:9px;font-size:.95rem;min-height:90px;resize:vertical}
+.modal .fld input,.modal .fld select{width:100%;padding:11px 13px;border:1.5px solid var(--line);border-radius:9px;font-size:.95rem}
+.modal-actions{display:flex;gap:10px;margin-top:18px}
+.btn-ghost{background:var(--soft);border:1px solid var(--line);color:var(--ink);flex:1}
+.btn-danger{background:#fdeaea;color:#c0392b;border:1px solid #f5c6c6}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+@media(max-width:1100px){.stats{grid-template-columns:repeat(2,1fr)}.board{grid-template-columns:1fr;}.col{margin-bottom:4px}}
+@media(max-width:560px){.topbar .brand b{display:none}}
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<div class="login-wrap" id="loginWrap">
+  <div class="login-card">
+    <img src="assets/logo.webp" alt="Krown">
+    <h1>Krown CRM</h1>
+    <p>Sign in to view your leads</p>
+    <div class="msg" id="loginMsg"></div>
+    <div class="fld"><label for="email">Email</label><input id="email" type="email" autocomplete="username" placeholder="you@krownconstruction.net"></div>
+    <div class="fld"><label for="password">Password</label><input id="password" type="password" autocomplete="current-password" placeholder="••••••••"></div>
+    <button class="btn btn-primary" id="loginBtn">Sign In</button>
+    <p class="hint" id="setupHint"></p>
+  </div>
+</div>
+
+<!-- ============ APP ============ -->
+<div class="app" id="app">
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div class="brand"><img src="assets/logo.webp" alt="Krown"><b>Lead Pipeline</b></div>
+      <div class="topbar-actions">
+        <span class="who" id="whoami"></span>
+        <button class="icon-btn" id="addBtn">+ Add Lead</button>
+        <button class="icon-btn" id="refreshBtn">Refresh</button>
+        <button class="icon-btn" id="logoutBtn">Sign Out</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat b-new"><div class="n" id="st-new">0</div><div class="l">New</div></div>
+    <div class="stat b-week"><div class="n" id="st-week">0</div><div class="l">This Week</div></div>
+    <div class="stat"><div class="n" id="st-open">0</div><div class="l">In Pipeline</div></div>
+    <div class="stat b-won"><div class="n" id="st-won">0</div><div class="l">Won</div></div>
+    <div class="stat"><div class="n" id="st-total">0</div><div class="l">Total Leads</div></div>
+  </div>
+
+  <div class="toolbar">
+    <input class="search" id="search" placeholder="Search by name, phone, service, city…">
+  </div>
+
+  <div class="board" id="board"></div>
+</div>
+
+<!-- Lead detail / notes modal -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal" id="modal"></div>
+</div>
+
+<script src="assets/config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function () {
+  var STAGES = ['New','Contacted','Quoted','Won','Lost'];
+  var COLORS = {New:'var(--new)',Contacted:'var(--contacted)',Quoted:'var(--quoted)',Won:'var(--won)',Lost:'var(--lost)'};
+  var loginMsg = document.getElementById('loginMsg');
+  var setupHint = document.getElementById('setupHint');
+  var sb = null, leads = [], filterText = '';
+
+  // Guard: Supabase must be configured
+  if (!window.KROWN_READY || !window.supabase) {
+    setupHint.innerHTML = '⚠️ Supabase isn\'t connected yet. Add your Project URL and anon key in <b>assets/config.js</b>, then run <b>supabase-setup.sql</b> in your Supabase SQL editor.';
+    document.getElementById('loginBtn').disabled = true;
+  } else {
+    sb = window.supabase.createClient(KROWN_CONFIG.SUPABASE_URL, KROWN_CONFIG.SUPABASE_ANON_KEY);
+    setupHint.textContent = 'Use the email + password you created in Supabase → Authentication → Users.';
+    init();
+  }
+
+  async function init() {
+    var s = await sb.auth.getSession();
+    if (s.data.session) showApp(s.data.session.user);
+  }
+
+  // ---- Auth ----
+  document.getElementById('loginBtn').addEventListener('click', login);
+  document.getElementById('password').addEventListener('keydown', function(e){ if(e.key==='Enter') login(); });
+
+  async function login() {
+    loginMsg.className = 'msg';
+    var email = document.getElementById('email').value.trim();
+    var pw = document.getElementById('password').value;
+    if (!email || !pw) { loginMsg.className='msg err'; loginMsg.textContent='Enter your email and password.'; return; }
+    var btn = document.getElementById('loginBtn'); btn.disabled=true; btn.textContent='Signing in…';
+    var res = await sb.auth.signInWithPassword({ email: email, password: pw });
+    btn.disabled=false; btn.textContent='Sign In';
+    if (res.error) { loginMsg.className='msg err'; loginMsg.textContent=res.error.message; return; }
+    showApp(res.data.user);
+  }
+
+  document.getElementById('logoutBtn').addEventListener('click', async function(){
+    await sb.auth.signOut(); location.reload();
+  });
+
+  function showApp(user) {
+    document.getElementById('loginWrap').style.display='none';
+    document.getElementById('app').style.display='block';
+    document.getElementById('whoami').textContent = user.email;
+    loadLeads();
+    // Realtime: new website leads appear instantly
+    sb.channel('leads-stream')
+      .on('postgres_changes', { event:'*', schema:'public', table:'leads' }, loadLeads)
+      .subscribe();
+  }
+
+  // ---- Data ----
+  async function loadLeads() {
+    var res = await sb.from('leads').select('*').order('created_at', { ascending:false });
+    if (res.error) { console.error(res.error); return; }
+    leads = res.data || [];
+    renderStats(); renderBoard();
+  }
+
+  function renderStats() {
+    var weekAgo = Date.now() - 7*24*3600*1000;
+    var n = leads.filter(l=>l.status==='New').length;
+    var week = leads.filter(l=> new Date(l.created_at).getTime() > weekAgo).length;
+    var open = leads.filter(l=> l.status!=='Won' && l.status!=='Lost').length;
+    var won = leads.filter(l=>l.status==='Won').length;
+    document.getElementById('st-new').textContent=n;
+    document.getElementById('st-week').textContent=week;
+    document.getElementById('st-open').textContent=open;
+    document.getElementById('st-won').textContent=won;
+    document.getElementById('st-total').textContent=leads.length;
+  }
+
+  function matches(l) {
+    if (!filterText) return true;
+    var s = (l.name+' '+(l.phone||'')+' '+(l.service||'')+' '+(l.city||'')).toLowerCase();
+    return s.indexOf(filterText) > -1;
+  }
+
+  function fmtDate(iso){ var d=new Date(iso); return d.toLocaleDateString(undefined,{month:'short',day:'numeric'})+' · '+d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}); }
+  function esc(s){ return (s||'').replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+
+  function renderBoard() {
+    var board = document.getElementById('board');
+    board.innerHTML='';
+    STAGES.forEach(function(stage){
+      var items = leads.filter(l=> l.status===stage && matches(l));
+      var col = document.createElement('div');
+      col.className='col'; col.setAttribute('data-stage',stage);
+      col.innerHTML =
+        '<div class="col-head"><span><span class="dot" style="background:'+COLORS[stage]+'"></span><b>'+stage+'</b></span><span class="count">'+items.length+'</span></div>'+
+        '<div class="col-body" data-stage="'+stage+'"></div>';
+      board.appendChild(col);
+      var body = col.querySelector('.col-body');
+      items.forEach(function(l){ body.appendChild(card(l)); });
+
+      // drag targets
+      col.addEventListener('dragover', function(e){ e.preventDefault(); col.classList.add('drag-over'); });
+      col.addEventListener('dragleave', function(){ col.classList.remove('drag-over'); });
+      col.addEventListener('drop', function(e){
+        e.preventDefault(); col.classList.remove('drag-over');
+        var id=e.dataTransfer.getData('text/plain');
+        setStatus(id, stage);
+      });
+    });
+  }
+
+  function card(l) {
+    var el = document.createElement('div');
+    el.className='card'; el.draggable=true;
+    el.innerHTML =
+      '<div class="cname">'+esc(l.name)+'<span class="cdate">'+fmtDate(l.created_at)+'</span></div>'+
+      (l.service?'<div class="csvc">'+esc(l.service)+'</div>':'')+
+      '<div class="cmeta">'+
+        (l.phone?'<a href="tel:'+esc(l.phone)+'">📞 '+esc(l.phone)+'</a>':'')+
+        (l.email?'<a href="mailto:'+esc(l.email)+'">✉️ '+esc(l.email)+'</a>':'')+
+        (l.city?'<span>📍 '+esc(l.city)+'</span>':'')+
+      '</div>'+
+      (l.message?'<div class="cmsg">'+esc(l.message)+'</div>':'')+
+      '<div class="cfoot">'+
+        (l.phone?'<a class="mini" href="tel:'+esc(l.phone)+'">Call</a>':'')+
+        '<button class="mini" data-act="open">Details</button>'+
+      '</div>';
+    el.addEventListener('dragstart', function(e){ e.dataTransfer.setData('text/plain', l.id); });
+    el.querySelector('[data-act="open"]').addEventListener('click', function(){ openModal(l); });
+    return el;
+  }
+
+  async function setStatus(id, status) {
+    var lead = leads.find(l=>String(l.id)===String(id));
+    if (!lead || lead.status===status) return;
+    lead.status = status; renderStats(); renderBoard();
+    await sb.from('leads').update({ status: status }).eq('id', id);
+  }
+
+  // ---- Modal ----
+  var modalBg = document.getElementById('modalBg'), modal = document.getElementById('modal');
+  modalBg.addEventListener('click', function(e){ if(e.target===modalBg) modalBg.classList.remove('open'); });
+
+  function openModal(l) {
+    modal.innerHTML =
+      '<h3>'+esc(l.name)+'</h3>'+
+      '<div class="fld"><label>Status</label><select id="m-status">'+
+        STAGES.map(s=>'<option'+(s===l.status?' selected':'')+'>'+s+'</option>').join('')+'</select></div>'+
+      '<div class="row2">'+
+        '<div class="fld"><label>Phone</label><input id="m-phone" value="'+esc(l.phone)+'"></div>'+
+        '<div class="fld"><label>Email</label><input id="m-email" value="'+esc(l.email||'')+'"></div>'+
+      '</div>'+
+      '<div class="row2">'+
+        '<div class="fld"><label>Service</label><input id="m-service" value="'+esc(l.service||'')+'"></div>'+
+        '<div class="fld"><label>City / ZIP</label><input id="m-city" value="'+esc(l.city||'')+'"></div>'+
+      '</div>'+
+      '<div class="fld"><label>Their Message</label><textarea id="m-message">'+esc(l.message||'')+'</textarea></div>'+
+      '<div class="fld"><label>Your Notes</label><textarea id="m-notes" placeholder="Follow-up notes, quote amount, next step…">'+esc(l.notes||'')+'</textarea></div>'+
+      '<div class="modal-actions">'+
+        '<button class="btn btn-danger" id="m-delete">Delete</button>'+
+        '<button class="btn btn-ghost" id="m-cancel">Cancel</button>'+
+        '<button class="btn btn-primary" id="m-save" style="flex:1">Save</button>'+
+      '</div>';
+    modalBg.classList.add('open');
+    document.getElementById('m-cancel').addEventListener('click', function(){ modalBg.classList.remove('open'); });
+    document.getElementById('m-save').addEventListener('click', async function(){
+      var upd = {
+        status:document.getElementById('m-status').value,
+        phone:document.getElementById('m-phone').value.trim(),
+        email:document.getElementById('m-email').value.trim()||null,
+        service:document.getElementById('m-service').value.trim()||null,
+        city:document.getElementById('m-city').value.trim()||null,
+        message:document.getElementById('m-message').value.trim()||null,
+        notes:document.getElementById('m-notes').value.trim()||null
+      };
+      await sb.from('leads').update(upd).eq('id', l.id);
+      modalBg.classList.remove('open'); loadLeads();
+    });
+    document.getElementById('m-delete').addEventListener('click', async function(){
+      if(!confirm('Delete this lead permanently?')) return;
+      await sb.from('leads').delete().eq('id', l.id);
+      modalBg.classList.remove('open'); loadLeads();
+    });
+  }
+
+  // ---- Add manual lead (phone-ins) ----
+  document.getElementById('addBtn').addEventListener('click', function(){
+    modal.innerHTML =
+      '<h3>Add a Lead</h3>'+
+      '<div class="fld"><label>Name *</label><input id="a-name"></div>'+
+      '<div class="row2">'+
+        '<div class="fld"><label>Phone *</label><input id="a-phone"></div>'+
+        '<div class="fld"><label>Email</label><input id="a-email"></div>'+
+      '</div>'+
+      '<div class="row2">'+
+        '<div class="fld"><label>Service</label><input id="a-service"></div>'+
+        '<div class="fld"><label>City / ZIP</label><input id="a-city"></div>'+
+      '</div>'+
+      '<div class="fld"><label>Notes</label><textarea id="a-message" placeholder="What do they need?"></textarea></div>'+
+      '<div class="modal-actions">'+
+        '<button class="btn btn-ghost" id="a-cancel">Cancel</button>'+
+        '<button class="btn btn-primary" id="a-save" style="flex:1">Add Lead</button>'+
+      '</div>';
+    modalBg.classList.add('open');
+    document.getElementById('a-cancel').addEventListener('click', function(){ modalBg.classList.remove('open'); });
+    document.getElementById('a-save').addEventListener('click', async function(){
+      var name=document.getElementById('a-name').value.trim();
+      var phone=document.getElementById('a-phone').value.trim();
+      if(!name||!phone){ alert('Name and phone are required.'); return; }
+      await sb.from('leads').insert([{
+        name:name, phone:phone,
+        email:document.getElementById('a-email').value.trim()||null,
+        service:document.getElementById('a-service').value.trim()||null,
+        city:document.getElementById('a-city').value.trim()||null,
+        message:document.getElementById('a-message').value.trim()||null,
+        source:'phone', status:'New'
+      }]);
+      modalBg.classList.remove('open'); loadLeads();
+    });
+  });
+
+  document.getElementById('refreshBtn').addEventListener('click', loadLeads);
+  document.getElementById('search').addEventListener('input', function(e){
+    filterText = e.target.value.toLowerCase().trim(); renderBoard();
+  });
+})();
+</script>
+</body>
+</html>
