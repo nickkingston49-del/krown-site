@@ -276,14 +276,17 @@
         <span class="eyebrow">Reviews</span>
         <h2>What Your Neighbors Are Saying</h2>
       </div>
-      <a class="google-chip" href="https://maps.app.goo.gl/aw98bvtfo5fLcP8w5" target="_blank" rel="noopener">
-        <span class="g-badge" aria-hidden="true">G</span>
-        <div>
-          <div class="stars">★★★★★</div>
-          <b>Rated 5.0 on Google</b>
-          <small>From 30 five-star reviews — tap to read or leave one</small>
-        </div>
-      </a>
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        <a class="google-chip" href="https://maps.app.goo.gl/aw98bvtfo5fLcP8w5" target="_blank" rel="noopener">
+          <span class="g-badge" aria-hidden="true">G</span>
+          <div>
+            <div class="stars">★★★★★</div>
+            <b>Rated 5.0 on Google</b>
+            <small>From 30 five-star reviews — tap to read or leave one</small>
+          </div>
+        </a>
+        <a class="bbb-seal" href="https://www.bbb.org/us/tx/nederland/profile/residential-roofing/krown-roofing-and-construction-llc-0845-90104288/#sealclick" target="_blank" rel="nofollow"><img src="https://seal-southeasttexas.bbb.org/seals/blue-seal-200-42-bbb-90104288.png" alt="Krown Roofing and Construction LLC BBB Business Review"></a>
+      </div>
     </div>
     <div class="review-grid">
       <!-- Verbatim customer reviews. Some name "Tyler" / "T&N" (prior partnership);
@@ -503,20 +506,20 @@
 
     btn.disabled = true; btn.textContent = 'Sending…';
 
-    // Path A: Supabase is configured -> store the lead
+    // Try to save the lead straight to the database.
     if (sb) {
-      var res = await sb.from('leads').insert([data]);
-      btn.disabled = false; btn.textContent = 'Send My Request';
-      if (res.error) {
-        show('err', "Something went wrong sending that. Please call us at (409) 719-2053 and we'll take care of you.");
-        return;
-      }
-      form.reset();
-      show('ok', "Thanks! Your request is in — we'll reach out shortly. Need us now? Call (409) 719-2053.");
-      return;
+      try {
+        var res = await sb.from('leads').insert([data]);
+        if (!res.error) {
+          btn.disabled = false; btn.textContent = 'Send My Request';
+          form.reset();
+          show('ok', "Thanks! Your request is in — we'll reach out shortly. Need us now? Call (409) 719-2053.");
+          return;
+        }
+      } catch (err) { /* database unreachable — fall through to the email safety net */ }
     }
 
-    // Path B: Supabase not wired up yet -> open email so no lead is lost
+    // Safety net: database is asleep, down, or not configured -> open an email so no lead is ever lost.
     var body = encodeURIComponent(
       'New estimate request from the website:\n\n' +
       'Name: ' + data.name + '\nPhone: ' + data.phone +
@@ -526,7 +529,7 @@
     window.location.href = 'mailto:' + KROWN_CONFIG.FALLBACK_EMAIL +
       '?subject=' + encodeURIComponent('Estimate Request — ' + data.name) + '&body=' + body;
     btn.disabled = false; btn.textContent = 'Send My Request';
-    show('ok', 'Opening your email app to finish sending. Or just call (409) 719-2053.');
+    show('ok', "Opening your email app so your request still reaches us — or just call (409) 719-2053.");
   });
 })();
 </script>

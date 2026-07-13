@@ -121,15 +121,15 @@
     if (!data.name || !data.phone) { show('err','Please add your name and a phone number so we can reach you.'); return; }
     btn.disabled = true; btn.textContent = 'Sending…';
     if (sb) {
-      var res = await sb.from('leads').insert([data]);
-      btn.disabled = false; btn.textContent = 'Send My Request';
-      if (res.error) { show('err',"Something went wrong sending that. Please call us at (409) 719-2053 and we'll take care of you."); return; }
-      form.reset(); show('ok',"Thanks! Your request is in — we'll reach out shortly. Need us now? Call (409) 719-2053."); return;
+      try {
+        var res = await sb.from('leads').insert([data]);
+        if (!res.error) { btn.disabled = false; btn.textContent = 'Send My Request'; form.reset(); show('ok',"Thanks! Your request is in — we'll reach out shortly. Need us now? Call (409) 719-2053."); return; }
+      } catch (err) { /* database unreachable — fall through to the email safety net */ }
     }
     var body = encodeURIComponent('New estimate request from the website:\n\nName: '+data.name+'\nPhone: '+data.phone+'\nEmail: '+(data.email||'-')+'\nService: '+(data.service||'-')+'\nCity/ZIP: '+(data.city||'-')+'\n\nDetails:\n'+(data.message||'-'));
     window.location.href = 'mailto:' + KROWN_CONFIG.FALLBACK_EMAIL + '?subject=' + encodeURIComponent('Estimate Request — ' + data.name) + '&body=' + body;
     btn.disabled = false; btn.textContent = 'Send My Request';
-    show('ok','Opening your email app to finish sending. Or just call (409) 719-2053.');
+    show('ok',"Opening your email app so your request still reaches us — or just call (409) 719-2053.");
   });
 })();
 </script>
