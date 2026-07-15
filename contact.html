@@ -110,6 +110,26 @@
     sb = window.supabase.createClient(KROWN_CONFIG.SUPABASE_URL, KROWN_CONFIG.SUPABASE_ANON_KEY);
   }
   function show(type, msg){ statusEl.className = 'form-status ' + type; statusEl.textContent = msg; statusEl.scrollIntoView({behavior:'smooth',block:'center'}); }
+  var WEB3FORMS_KEY = 'd47b76a4-d718-44f9-bdda-4833c9720325';
+  async function notifyByEmail(data) {
+    try {
+      var r = await fetch('https://api.web3forms.com/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({
+          access_key: WEB3FORMS_KEY,
+          subject: 'New Website Lead — ' + data.name,
+          from_name: 'Krown Website',
+          name: data.name, phone: data.phone,
+          email: data.email || 'not provided',
+          service: data.service || '-', city: data.city || '-',
+          message: data.message || '-'
+        })
+      });
+      var j = await r.json();
+      return !!(j && j.success);
+    } catch (err) { return false; }
+  }
   form.addEventListener('submit', async function (e) {
     e.preventDefault();
     var data = {
@@ -120,16 +140,19 @@
     };
     if (!data.name || !data.phone) { show('err','Please add your name and a phone number so we can reach you.'); return; }
     btn.disabled = true; btn.textContent = 'Sending…';
+    var stored = false;
     if (sb) {
-      try {
-        var res = await sb.from('leads').insert([data]);
-        if (!res.error) { btn.disabled = false; btn.textContent = 'Send My Request'; form.reset(); show('ok',"Thanks! Your request is in — we'll reach out shortly. Need us now? Call (409) 719-2053."); return; }
-      } catch (err) { /* database unreachable — fall through to the email safety net */ }
+      try { var res = await sb.from('leads').insert([data]); stored = !res.error; }
+      catch (err) { /* database unreachable */ }
     }
-    var body = encodeURIComponent('New estimate request from the website:\n\nName: '+data.name+'\nPhone: '+data.phone+'\nEmail: '+(data.email||'-')+'\nService: '+(data.service||'-')+'\nCity/ZIP: '+(data.city||'-')+'\n\nDetails:\n'+(data.message||'-'));
-    window.location.href = 'mailto:' + KROWN_CONFIG.FALLBACK_EMAIL + '?subject=' + encodeURIComponent('Estimate Request — ' + data.name) + '&body=' + body;
+    var emailed = await notifyByEmail(data);
     btn.disabled = false; btn.textContent = 'Send My Request';
-    show('ok',"Opening your email app so your request still reaches us — or just call (409) 719-2053.");
+    if (stored || emailed) {
+      form.reset();
+      show('ok',"Thanks! Your request is in — we'll reach out shortly. Need us now? Call (409) 719-2053.");
+    } else {
+      show('err',"Something went wrong sending that. Please call us at (409) 719-2053 and we'll take care of you.");
+    }
   });
 })();
 </script>
