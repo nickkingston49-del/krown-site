@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Your Estimate | Krown Roofing and Construction</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#2a47c7">
+<link rel="icon" type="image/png" href="assets/logo.webp">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  body{background:#eef1f8}
+  .est-topbar{background:#fff;border-bottom:1px solid var(--line);box-shadow:0 2px 12px rgba(27,42,107,.05)}
+  .est-topbar .wrap{display:flex;align-items:center;justify-content:space-between;padding:12px 22px;gap:14px}
+  .est-topbar img{height:46px;width:auto}
+  .est-topbar a.phone{font-weight:700;color:var(--blue);white-space:nowrap}
+  .est-shell{max-width:820px;margin:26px auto 60px;padding:0 18px}
+  .est-card{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
+  .est-head{background:linear-gradient(135deg,var(--blue),var(--blue-deep));color:#fff;padding:26px 28px}
+  .est-head h1{color:#fff;font-size:1.5rem;margin:0 0 4px}
+  .est-head .meta{color:rgba(255,255,255,.9);font-size:.95rem}
+  .est-badge{display:inline-block;margin-top:12px;padding:5px 14px;border-radius:999px;font-weight:700;font-size:.82rem;background:rgba(255,255,255,.18);color:#fff}
+  .est-body{padding:26px 28px}
+  .est-section-label{font-weight:700;color:var(--blue-ink);font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;margin:0 0 8px}
+  .est-cust{color:var(--slate);font-size:.98rem;margin-bottom:22px;line-height:1.5}
+  table.est-items{width:100%;border-collapse:collapse;margin:6px 0 4px}
+  table.est-items th{text-align:left;font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--slate);border-bottom:2px solid var(--line);padding:8px 6px}
+  table.est-items td{padding:11px 6px;border-bottom:1px solid var(--line);color:var(--ink);font-size:.97rem;vertical-align:top}
+  table.est-items td.num,table.est-items th.num{text-align:right;white-space:nowrap}
+  .est-totals{margin:16px 0 4px;margin-left:auto;width:min(320px,100%)}
+  .est-totals .row{display:flex;justify-content:space-between;padding:6px 6px;font-size:.98rem;color:var(--slate)}
+  .est-totals .row.total{border-top:2px solid var(--line);margin-top:4px;padding-top:12px;font-size:1.2rem;font-weight:800;color:var(--blue-ink)}
+  .est-notes{background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-top:20px;color:var(--slate);white-space:pre-wrap}
+  .est-actions{padding:22px 28px 28px;border-top:1px solid var(--line);display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+  .est-actions .btn{flex:1;justify-content:center;min-width:150px}
+  .btn-decline{background:#fff;color:#b42318;border:2px solid #f2c4c0}
+  .btn-decline:hover{background:#fdecea}
+  .est-result{padding:22px 28px 28px;border-top:1px solid var(--line)}
+  .est-result .ok{background:#e9f7ef;border:1px solid #b7e4c7;color:#1b7a43;border-radius:12px;padding:16px 18px;font-weight:600}
+  .est-result .no{background:#fdecea;border:1px solid #f5c2c0;color:#b42318;border-radius:12px;padding:16px 18px;font-weight:600}
+  .est-msg{max-width:820px;margin:60px auto;text-align:center;color:var(--slate);font-size:1.05rem}
+  .est-foot{text-align:center;color:var(--slate);font-size:.86rem;margin-top:22px}
+  @media(max-width:520px){ .est-actions .btn{flex:1 1 100%} }
+</style>
+</head>
+<body>
+
+<div class="est-topbar">
+  <div class="wrap">
+    <a href="index.html" aria-label="Krown Roofing and Construction"><img src="assets/logo.webp" alt="Krown Roofing and Construction"></a>
+    <a class="phone" href="tel:+14097192053">(409) 719-2053</a>
+  </div>
+</div>
+
+<div class="est-shell">
+  <div id="loading" class="est-msg">Loading your estimate…</div>
+  <div id="notfound" class="est-msg" hidden>Sorry, we couldn't find this estimate. Please check your link or call us at <a href="tel:+14097192053">(409) 719-2053</a>.</div>
+
+  <div id="estimate" hidden>
+    <div class="est-card">
+      <div class="est-head">
+        <h1>Estimate from Krown Roofing and Construction</h1>
+        <div class="meta" id="headMeta"></div>
+        <span class="est-badge" id="statusBadge"></span>
+      </div>
+      <div class="est-body">
+        <p class="est-section-label">Prepared for</p>
+        <div class="est-cust" id="custBlock"></div>
+
+        <p class="est-section-label">Details</p>
+        <table class="est-items">
+          <thead>
+            <tr>
+              <th>Description</th>
+              <th class="num">Qty</th>
+              <th class="num">Price</th>
+              <th class="num">Amount</th>
+            </tr>
+          </thead>
+          <tbody id="itemsBody"></tbody>
+        </table>
+
+        <div class="est-totals">
+          <div class="row"><span>Subtotal</span><span id="subtotal"></span></div>
+          <div class="row" id="taxRow"><span id="taxLabel">Tax</span><span id="tax"></span></div>
+          <div class="row total"><span>Total</span><span id="total"></span></div>
+        </div>
+
+        <div class="est-notes" id="notesBlock" hidden></div>
+      </div>
+
+      <div class="est-actions" id="actions" hidden>
+        <a class="btn btn-decline" id="declineBtn" href="javascript:void(0)">Decline</a>
+        <a class="btn btn-gold" id="approveBtn" href="javascript:void(0)">Approve This Estimate</a>
+      </div>
+      <div class="est-result" id="resultArea" hidden></div>
+    </div>
+    <p class="est-foot">Questions about your estimate? Call or text Krown at (409) 719-2053.</p>
+  </div>
+</div>
+
+<script src="assets/config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function () {
+  var WEB3FORMS_KEY = 'd47b76a4-d718-44f9-bdda-4833c9720325';
+  var $ = function (id) { return document.getElementById(id); };
+  var id = new URLSearchParams(location.search).get('id');
+  var sb = (window.KROWN_READY && window.supabase)
+    ? window.supabase.createClient(KROWN_CONFIG.SUPABASE_URL, KROWN_CONFIG.SUPABASE_ANON_KEY)
+    : null;
+  var est = null;
+
+  function money(n) {
+    n = Number(n) || 0;
+    return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+
+  function totals(e) {
+    var items = Array.isArray(e.items) ? e.items : [];
+    var sub = 0;
+    items.forEach(function (it) { sub += (Number(it.qty) || 0) * (Number(it.unit_price) || 0); });
+    var rate = Number(e.tax_rate) || 0;
+    var tax = sub * rate / 100;
+    return { sub: sub, rate: rate, tax: tax, total: sub + tax };
+  }
+
+  function render(e) {
+    est = e;
+    var t = totals(e);
+    var d = e.created_at ? new Date(e.created_at) : new Date();
+    $('headMeta').textContent = 'Estimate #' + String(e.id).slice(0, 8).toUpperCase() +
+      ' · ' + d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+    var badge = $('statusBadge');
+    badge.textContent = e.status;
+    badge.style.background = e.status === 'Approved' ? 'rgba(46,204,113,.28)'
+      : e.status === 'Declined' ? 'rgba(255,120,120,.30)' : 'rgba(255,255,255,.18)';
+
+    var cust = '<strong style="color:var(--blue-ink)">' + esc(e.customer_name) + '</strong>';
+    if (e.customer_phone) cust += '<br>' + esc(e.customer_phone);
+    if (e.customer_email) cust += '<br>' + esc(e.customer_email);
+    $('custBlock').innerHTML = cust;
+
+    var rows = (Array.isArray(e.items) ? e.items : []).map(function (it) {
+      var amt = (Number(it.qty) || 0) * (Number(it.unit_price) || 0);
+      return '<tr><td>' + esc(it.description) + '</td><td class="num">' + (Number(it.qty) || 0) +
+        '</td><td class="num">' + money(it.unit_price) + '</td><td class="num">' + money(amt) + '</td></tr>';
+    }).join('');
+    $('itemsBody').innerHTML = rows || '<tr><td colspan="4" style="color:var(--slate)">No line items.</td></tr>';
+
+    $('subtotal').textContent = money(t.sub);
+    if (t.rate > 0) { $('taxLabel').textContent = 'Tax (' + t.rate + '%)'; $('tax').textContent = money(t.tax); $('taxRow').hidden = false; }
+    else { $('taxRow').hidden = true; }
+    $('total').textContent = money(t.total);
+
+    if (e.notes) { $('notesBlock').textContent = e.notes; $('notesBlock').hidden = false; }
+    else { $('notesBlock').hidden = true; }
+
+    if (e.status === 'Sent') {
+      $('actions').hidden = false;
+      $('resultArea').hidden = true;
+    } else {
+      $('actions').hidden = true;
+      showResult(e.status);
+    }
+
+    $('loading').hidden = true;
+    $('estimate').hidden = false;
+  }
+
+  function showResult(status) {
+    var area = $('resultArea');
+    area.hidden = false;
+    if (status === 'Approved') {
+      area.innerHTML = '<div class="ok">✓ Thank you! You approved this estimate. Krown will be in touch to schedule your project. Need us sooner? Call (409) 719-2053.</div>';
+    } else {
+      area.innerHTML = '<div class="no">This estimate was declined. If that was a mistake or you\'d like changes, call us at (409) 719-2053.</div>';
+    }
+  }
+
+  function notifyOwner(status) {
+    try {
+      fetch('https://api.web3forms.com/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({
+          access_key: WEB3FORMS_KEY,
+          subject: 'Estimate ' + status + ' — ' + (est ? est.customer_name : ''),
+          from_name: 'Krown Estimates',
+          customer: est ? est.customer_name : '',
+          phone: est && est.customer_phone ? est.customer_phone : '-',
+          total: money(totals(est).total),
+          status: status
+        })
+      });
+    } catch (e) {}
+  }
+
+  async function decide(status) {
+    $('actions').hidden = true;
+    var res = $('resultArea'); res.hidden = false;
+    res.innerHTML = '<div style="color:var(--slate)">Saving…</div>';
+    try {
+      var r = await sb.rpc('set_estimate_status', { p_id: id, p_status: status });
+      if (r.error) throw r.error;
+      var updated = Array.isArray(r.data) ? r.data[0] : r.data;
+      if (updated) { est = updated; }
+      notifyOwner(status);
+      showResult(status);
+      var badge = $('statusBadge');
+      badge.textContent = status;
+      badge.style.background = status === 'Approved' ? 'rgba(46,204,113,.28)' : 'rgba(255,120,120,.30)';
+    } catch (err) {
+      res.innerHTML = '<div class="no">Something went wrong saving your response. Please call us at (409) 719-2053.</div>';
+    }
+  }
+
+  async function load() {
+    if (!id || !sb) { $('loading').hidden = true; $('notfound').hidden = false; return; }
+    try {
+      var r = await sb.rpc('get_estimate', { p_id: id });
+      if (r.error) throw r.error;
+      var e = Array.isArray(r.data) ? r.data[0] : r.data;
+      if (!e) { $('loading').hidden = true; $('notfound').hidden = false; return; }
+      render(e);
+    } catch (err) {
+      $('loading').hidden = true; $('notfound').hidden = false;
+    }
+  }
+
+  $('approveBtn').addEventListener('click', function () { decide('Approved'); });
+  $('declineBtn').addEventListener('click', function () {
+    if (confirm('Decline this estimate?')) decide('Declined');
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>

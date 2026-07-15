@@ -102,6 +102,32 @@ a{color:var(--blue)}
 
 @media(max-width:1100px){.stats{grid-template-columns:repeat(2,1fr)}.board{grid-template-columns:1fr;}.col{margin-bottom:4px}}
 @media(max-width:560px){.topbar .brand b{display:none}}
+
+/* ---- Estimates ---- */
+.tabs{max-width:1320px;margin:0 auto;padding:14px 22px 0;display:flex;gap:6px}
+.tab{background:transparent;border:0;border-bottom:3px solid transparent;padding:8px 14px;font-weight:700;color:var(--slate);font-size:.95rem}
+.tab.active{color:var(--blue);border-bottom-color:var(--blue)}
+.est-list{max-width:1320px;margin:0 auto;padding:6px 22px 60px;display:grid;gap:12px}
+.est-row{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 2px 8px rgba(16,29,73,.05)}
+.est-row .ec{flex:1;min-width:170px}
+.est-row .ec b{font-size:1rem}
+.est-row .ec small{color:var(--slate);display:block;margin-top:2px}
+.est-row .etotal{font-weight:800;font-size:1.05rem;color:var(--navy)}
+.est-status{padding:4px 11px;border-radius:999px;font-size:.76rem;font-weight:700}
+.est-status.Sent{background:rgba(45,76,179,.12);color:var(--blue)}
+.est-status.Approved{background:rgba(31,157,91,.14);color:var(--won)}
+.est-status.Declined{background:rgba(200,50,50,.1);color:#c0392b}
+.est-row .ebtns{display:flex;gap:8px}
+.est-row .ebtns .mini{background:var(--soft);border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:.8rem;font-weight:600;color:var(--ink);text-decoration:none}
+.est-row .ebtns .mini:hover{border-color:var(--blue);color:var(--blue)}
+.li-row{display:grid;grid-template-columns:1fr 56px 82px 30px;gap:7px;margin-bottom:8px;align-items:center}
+.li-row input{padding:9px 8px;border:1.5px solid var(--line);border-radius:8px;font-size:.88rem;width:100%}
+.li-x{background:#fdeaea;border:1px solid #f5c6c6;color:#c0392b;border-radius:8px;padding:8px 0;font-size:.8rem}
+.est-totline{display:flex;justify-content:space-between;padding:5px 2px;color:var(--slate)}
+.est-totline.grand{font-weight:800;color:var(--navy);font-size:1.1rem;border-top:2px solid var(--line);margin-top:6px;padding-top:10px}
+.linkbox{display:flex;gap:8px;margin-top:6px}
+.linkbox input{flex:1;padding:10px;border:1.5px solid var(--line);border-radius:8px;font-size:.82rem;background:var(--soft)}
+.modal.wide{max-width:620px}
 </style>
 </head>
 <body>
@@ -134,6 +160,12 @@ a{color:var(--blue)}
     </div>
   </div>
 
+  <div class="tabs">
+    <button class="tab active" id="tab-pipeline">Pipeline</button>
+    <button class="tab" id="tab-estimates">Estimates</button>
+  </div>
+
+  <div id="view-pipeline">
   <div class="stats">
     <div class="stat b-new"><div class="n" id="st-new">0</div><div class="l">New</div></div>
     <div class="stat b-week"><div class="n" id="st-week">0</div><div class="l">This Week</div></div>
@@ -147,6 +179,15 @@ a{color:var(--blue)}
   </div>
 
   <div class="board" id="board"></div>
+  </div>
+
+  <div id="view-estimates" hidden>
+    <div class="toolbar" style="justify-content:space-between;align-items:center">
+      <b style="font-size:1.05rem">Estimates</b>
+      <button class="icon-btn" id="newEstBtn" style="background:var(--gold);color:#1a1a1a;border-color:var(--gold)">+ New Estimate</button>
+    </div>
+    <div class="est-list" id="estList"></div>
+  </div>
 </div>
 
 <!-- Lead detail / notes modal -->
@@ -208,6 +249,12 @@ a{color:var(--blue)}
     sb.channel('leads-stream')
       .on('postgres_changes', { event:'*', schema:'public', table:'leads' }, loadLeads)
       .subscribe();
+    if (!estChannelSubscribed) {
+      sb.channel('est-stream')
+        .on('postgres_changes', { event:'*', schema:'public', table:'estimates' }, function(){ if(!document.getElementById('view-estimates').hidden) loadEstimates(); })
+        .subscribe();
+      estChannelSubscribed = true;
+    }
   }
 
   // ---- Data ----
@@ -298,6 +345,7 @@ a{color:var(--blue)}
   modalBg.addEventListener('click', function(e){ if(e.target===modalBg) modalBg.classList.remove('open'); });
 
   function openModal(l) {
+    modal.classList.remove('wide');
     modal.innerHTML =
       '<h3>'+esc(l.name)+'</h3>'+
       '<div class="fld"><label>Status</label><select id="m-status">'+
@@ -312,12 +360,14 @@ a{color:var(--blue)}
       '</div>'+
       '<div class="fld"><label>Their Message</label><textarea id="m-message">'+esc(l.message||'')+'</textarea></div>'+
       '<div class="fld"><label>Your Notes</label><textarea id="m-notes" placeholder="Follow-up notes, quote amount, next step…">'+esc(l.notes||'')+'</textarea></div>'+
+      '<button class="btn" id="m-estimate" style="width:100%;background:var(--gold);color:#1a1a1a;margin-bottom:10px">＋ Create Estimate for this Customer</button>'+
       '<div class="modal-actions">'+
         '<button class="btn btn-danger" id="m-delete">Delete</button>'+
         '<button class="btn btn-ghost" id="m-cancel">Cancel</button>'+
         '<button class="btn btn-primary" id="m-save" style="flex:1">Save</button>'+
       '</div>';
     modalBg.classList.add('open');
+    document.getElementById('m-estimate').addEventListener('click', function(){ openEstimateModal(l); });
     document.getElementById('m-cancel').addEventListener('click', function(){ modalBg.classList.remove('open'); });
     document.getElementById('m-save').addEventListener('click', async function(){
       var upd = {
@@ -341,6 +391,7 @@ a{color:var(--blue)}
 
   // ---- Add manual lead (phone-ins) ----
   document.getElementById('addBtn').addEventListener('click', function(){
+    modal.classList.remove('wide');
     modal.innerHTML =
       '<h3>Add a Lead</h3>'+
       '<div class="fld"><label>Name *</label><input id="a-name"></div>'+
@@ -379,6 +430,151 @@ a{color:var(--blue)}
   document.getElementById('search').addEventListener('input', function(e){
     filterText = e.target.value.toLowerCase().trim(); renderBoard();
   });
+
+  // ================= ESTIMATES =================
+  var estimates = [], estChannelSubscribed = false;
+
+  function estLink(id){ return new URL('estimate.html?id='+id, location.href).href; }
+  function money(n){ n=Number(n)||0; return '$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  function estTotals(items, rate){
+    var sub=0; (items||[]).forEach(function(it){ sub += (Number(it.qty)||0)*(Number(it.unit_price)||0); });
+    rate=Number(rate)||0; var tax=sub*rate/100; return {sub:sub, tax:tax, rate:rate, total:sub+tax};
+  }
+
+  var tabPipeline=document.getElementById('tab-pipeline'), tabEstimates=document.getElementById('tab-estimates');
+  tabPipeline.addEventListener('click', function(){ switchView('pipeline'); });
+  tabEstimates.addEventListener('click', function(){ switchView('estimates'); });
+  function switchView(v){
+    var pipe = v==='pipeline';
+    document.getElementById('view-pipeline').hidden = !pipe;
+    document.getElementById('view-estimates').hidden = pipe;
+    tabPipeline.classList.toggle('active', pipe);
+    tabEstimates.classList.toggle('active', !pipe);
+    if(!pipe) loadEstimates();
+  }
+
+  async function loadEstimates(){
+    if(!sb) return;
+    var res = await sb.from('estimates').select('*').order('created_at',{ascending:false});
+    if(res.error){ console.error(res.error); return; }
+    estimates = res.data||[];
+    renderEstimates();
+  }
+
+  function renderEstimates(){
+    var wrap=document.getElementById('estList');
+    if(!estimates.length){ wrap.innerHTML='<div class="empty"><b>No estimates yet</b>Click “+ New Estimate,” or open a lead and hit “Create Estimate.”</div>'; return; }
+    wrap.innerHTML='';
+    estimates.forEach(function(e){
+      var t=estTotals(e.items, e.tax_rate);
+      var row=document.createElement('div'); row.className='est-row';
+      row.innerHTML =
+        '<div class="ec"><b>'+esc(e.customer_name)+'</b><small>'+fmtDate(e.created_at)+(e.customer_phone?' · '+esc(e.customer_phone):'')+'</small></div>'+
+        '<div class="etotal">'+money(t.total)+'</div>'+
+        '<span class="est-status '+e.status+'">'+e.status+'</span>'+
+        '<div class="ebtns">'+
+          '<button class="mini" data-act="copy">Copy Link</button>'+
+          '<a class="mini" href="'+estLink(e.id)+'" target="_blank">Open</a>'+
+        '</div>';
+      row.querySelector('[data-act="copy"]').addEventListener('click', function(){
+        var link=estLink(e.id), self=this;
+        navigator.clipboard.writeText(link).then(function(){ self.textContent='Copied!'; setTimeout(function(){ self.textContent='Copy Link'; },1500); }, function(){ prompt('Copy this link:', link); });
+      });
+      wrap.appendChild(row);
+    });
+  }
+
+  document.getElementById('newEstBtn').addEventListener('click', function(){ openEstimateModal(null); });
+
+  function openEstimateModal(lead){
+    var items=[{description:'',qty:1,unit_price:''}];
+    modal.classList.add('wide');
+    modal.innerHTML =
+      '<h3>New Estimate</h3>'+
+      '<div class="row2">'+
+        '<div class="fld"><label>Customer Name *</label><input id="e-name" value="'+esc(lead?lead.name:'')+'"></div>'+
+        '<div class="fld"><label>Phone</label><input id="e-phone" value="'+esc(lead?lead.phone:'')+'"></div>'+
+      '</div>'+
+      '<div class="fld"><label>Email</label><input id="e-email" value="'+esc(lead&&lead.email?lead.email:'')+'"></div>'+
+      '<div class="fld"><label>Line Items</label><div id="e-items"></div>'+
+        '<button class="icon-btn" id="e-additem" type="button" style="margin-top:4px">+ Add line</button></div>'+
+      '<div class="row2">'+
+        '<div class="fld"><label>Tax Rate (%)</label><input id="e-tax" type="number" step="0.01" value="0"></div>'+
+        '<div class="fld"></div>'+
+      '</div>'+
+      '<div id="e-tot" style="margin:4px 0 8px"></div>'+
+      '<div class="fld"><label>Note to Customer</label><textarea id="e-notes" placeholder="Scope, timeline, terms…"></textarea></div>'+
+      '<div class="modal-actions">'+
+        '<button class="btn btn-ghost" id="e-cancel">Cancel</button>'+
+        '<button class="btn btn-primary" id="e-save" style="flex:1">Create &amp; Get Link</button>'+
+      '</div>';
+    modalBg.classList.add('open');
+
+    var itemsWrap=document.getElementById('e-items');
+    function renderItems(){
+      itemsWrap.innerHTML='';
+      items.forEach(function(it,idx){
+        var r=document.createElement('div'); r.className='li-row';
+        r.innerHTML='<input placeholder="Description" value="'+esc(it.description)+'" data-f="description">'+
+          '<input type="number" min="0" step="1" placeholder="Qty" value="'+(it.qty!==''?it.qty:'')+'" data-f="qty">'+
+          '<input type="number" min="0" step="0.01" placeholder="Price" value="'+(it.unit_price!==''?it.unit_price:'')+'" data-f="unit_price">'+
+          '<button class="li-x" type="button" title="Remove">✕</button>';
+        r.querySelectorAll('input').forEach(function(inp){
+          inp.addEventListener('input', function(){ items[idx][inp.getAttribute('data-f')] = inp.value; recompute(); });
+        });
+        r.querySelector('.li-x').addEventListener('click', function(){ items.splice(idx,1); if(!items.length) items.push({description:'',qty:1,unit_price:''}); renderItems(); recompute(); });
+        itemsWrap.appendChild(r);
+      });
+    }
+    function recompute(){
+      var t=estTotals(items, document.getElementById('e-tax').value);
+      var html='<div class="est-totline"><span>Subtotal</span><span>'+money(t.sub)+'</span></div>';
+      if(t.rate>0) html+='<div class="est-totline"><span>Tax ('+t.rate+'%)</span><span>'+money(t.tax)+'</span></div>';
+      html+='<div class="est-totline grand"><span>Total</span><span>'+money(t.total)+'</span></div>';
+      document.getElementById('e-tot').innerHTML=html;
+    }
+    renderItems(); recompute();
+    document.getElementById('e-additem').addEventListener('click', function(){ items.push({description:'',qty:1,unit_price:''}); renderItems(); });
+    document.getElementById('e-tax').addEventListener('input', recompute);
+    document.getElementById('e-cancel').addEventListener('click', function(){ modal.classList.remove('wide'); modalBg.classList.remove('open'); });
+    document.getElementById('e-save').addEventListener('click', async function(){
+      var name=document.getElementById('e-name').value.trim();
+      if(!name){ alert('Customer name is required.'); return; }
+      var clean=items.filter(function(it){ return (it.description||'').trim()!=='' || Number(it.unit_price)>0; })
+        .map(function(it){ return {description:(it.description||'').trim(), qty:Number(it.qty)||0, unit_price:Number(it.unit_price)||0}; });
+      if(!clean.length){ alert('Add at least one line item.'); return; }
+      var btn=document.getElementById('e-save'); btn.disabled=true; btn.textContent='Saving…';
+      var res=await sb.from('estimates').insert([{
+        customer_name:name,
+        customer_phone:document.getElementById('e-phone').value.trim()||null,
+        customer_email:document.getElementById('e-email').value.trim()||null,
+        items:clean,
+        tax_rate:Number(document.getElementById('e-tax').value)||0,
+        notes:document.getElementById('e-notes').value.trim()||null,
+        status:'Sent'
+      }]).select();
+      btn.disabled=false; btn.textContent='Create & Get Link';
+      if(res.error){ alert('Could not save: '+res.error.message); return; }
+      showEstimateLink(res.data[0]);
+    });
+  }
+
+  function showEstimateLink(row){
+    var link=estLink(row.id);
+    modal.innerHTML =
+      '<h3>Estimate Ready ✓</h3>'+
+      '<p style="color:var(--slate);margin-top:-6px">Send this link to <b>'+esc(row.customer_name)+'</b> by text or email. They can view it and tap Approve.</p>'+
+      '<div class="linkbox"><input id="e-link" value="'+link+'" readonly><button class="btn btn-primary" id="e-copy" style="width:auto;padding:10px 16px">Copy</button></div>'+
+      '<div class="modal-actions">'+
+        (row.customer_phone?'<a class="btn btn-ghost" href="sms:'+esc(row.customer_phone)+'?&body='+encodeURIComponent('Here is your estimate from Krown Roofing and Construction: '+link)+'">Text it</a>':'')+
+        '<button class="btn btn-primary" id="e-done" style="flex:1">Done</button>'+
+      '</div>';
+    document.getElementById('e-copy').addEventListener('click', function(){
+      var inp=document.getElementById('e-link'), self=this; inp.select();
+      navigator.clipboard.writeText(inp.value).then(function(){ self.textContent='Copied!'; }, function(){});
+    });
+    document.getElementById('e-done').addEventListener('click', function(){ modal.classList.remove('wide'); modalBg.classList.remove('open'); switchView('estimates'); });
+  }
 })();
 </script>
 </body>
