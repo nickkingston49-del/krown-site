@@ -1,0 +1,25 @@
+name: Keep Supabase Awake
+
+# Pings the Supabase REST API on a schedule so the free-tier project
+# never pauses for inactivity (Supabase pauses after 7 days of no traffic).
+# Runs twice a week (Mon & Thu) for a safety margin, and can be run manually.
+
+on:
+  schedule:
+    - cron: '0 14 * * 1,4'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase database
+        run: |
+          curl -sS -X POST \
+            "https://dowuilwpulaemjqrlnwz.supabase.co/rest/v1/rpc/get_estimate" \
+            -H "apikey: sb_publishable_AYehP1dFj0O6zdQelAjJcA_1XM2VXTf" \
+            -H "Authorization: Bearer sb_publishable_AYehP1dFj0O6zdQelAjJcA_1XM2VXTf" \
+            -H "Content-Type: application/json" \
+            -d '{"p_id":"00000000-0000-0000-0000-000000000000"}' \
+            -o /dev/null -w "Supabase ping status: %{http_code}\n"
+
