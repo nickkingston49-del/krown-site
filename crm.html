@@ -120,6 +120,7 @@ a{color:var(--blue)}
 .est-row .ebtns{display:flex;gap:8px}
 .est-row .ebtns .mini{background:var(--soft);border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:.8rem;font-weight:600;color:var(--ink);text-decoration:none}
 .est-row .ebtns .mini:hover{border-color:var(--blue);color:var(--blue)}
+.est-row .ebtns .mini.danger:hover{border-color:#d64545;color:#d64545}
 .li-row{display:grid;grid-template-columns:1fr 56px 82px 30px;gap:7px;margin-bottom:8px;align-items:center}
 .li-row input{padding:9px 8px;border:1.5px solid var(--line);border-radius:8px;font-size:.88rem;width:100%}
 .li-x{background:#fdeaea;border:1px solid #f5c6c6;color:#c0392b;border-radius:8px;padding:8px 0;font-size:.8rem}
@@ -475,10 +476,18 @@ a{color:var(--blue)}
         '<div class="ebtns">'+
           '<button class="mini" data-act="copy">Copy Link</button>'+
           '<a class="mini" href="'+estLink(e.id)+'" target="_blank">Open</a>'+
+          '<button class="mini danger" data-act="del">Delete</button>'+
         '</div>';
       row.querySelector('[data-act="copy"]').addEventListener('click', function(){
         var link=estLink(e.id), self=this;
         navigator.clipboard.writeText(link).then(function(){ self.textContent='Copied!'; setTimeout(function(){ self.textContent='Copy Link'; },1500); }, function(){ prompt('Copy this link:', link); });
+      });
+      row.querySelector('[data-act="del"]').addEventListener('click', async function(){
+        if(!confirm('Delete this estimate for '+e.customer_name+'? This cannot be undone.')) return;
+        var self=this; self.textContent='Deleting…'; self.disabled=true;
+        var res=await sb.from('estimates').delete().eq('id', e.id);
+        if(res.error){ alert('Could not delete: '+res.error.message); self.textContent='Delete'; self.disabled=false; return; }
+        loadEstimates();
       });
       wrap.appendChild(row);
     });
