@@ -470,31 +470,38 @@ a{color:var(--blue)}
 
   // ---- Customers (auto-built from leads + estimates) ----
   var customers = [];
-  function custKey(name, phone, email){
-    var ph=(phone||'').replace(/\D/g,'');
-    if(ph.length>=7) return 'p:'+ph;
-    if(email) return 'e:'+email.toLowerCase().trim();
-    var nm=(name||'').toLowerCase().trim();
-    return nm?'n:'+nm:'';
-  }
+  function normPhone(p){ var d=(p||'').replace(/\D/g,''); if(d.length===11 && d[0]==='1') d=d.slice(1); return d.length>=7?d:''; }
+  function normEmail(e){ return (e||'').toLowerCase().trim(); }
   function buildCustomers(){
-    var map={};
-    function add(rec){
-      var key=custKey(rec.name, rec.phone, rec.email);
-      if(!key) return;
-      var c=map[key];
-      if(!c){ c={name:rec.name||'',phone:rec.phone||'',email:rec.email||'',city:rec.city||'',service:rec.service||'',lastDate:rec.date,estCount:0,estTotal:0}; map[key]=c; }
-      if(!c.name && rec.name) c.name=rec.name;
-      if(!c.phone && rec.phone) c.phone=rec.phone;
-      if(!c.email && rec.email) c.email=rec.email;
-      if(!c.city && rec.city) c.city=rec.city;
-      if(!c.service && rec.service) c.service=rec.service;
-      if(rec.date && (!c.lastDate || new Date(rec.date)>new Date(c.lastDate))) c.lastDate=rec.date;
-      if(rec.isEst){ c.estCount++; c.estTotal+=rec.estTotal||0; }
-    }
-    (leads||[]).forEach(function(l){ add({name:l.name,phone:l.phone,email:l.email,city:l.city,service:l.service,date:l.created_at,isEst:false}); });
-    (estimates||[]).forEach(function(e){ var t=estTotals(e.items,e.tax_rate); add({name:e.customer_name,phone:e.customer_phone,email:e.customer_email,date:e.created_at,isEst:true,estTotal:t.total}); });
-    customers=Object.keys(map).map(function(k){return map[k];}).sort(function(a,b){ return new Date(b.lastDate||0)-new Date(a.lastDate||0); });
+    // Collect every record from leads + estimates
+    var recs=[];
+    (leads||[]).forEach(function(l){ recs.push({name:l.name||'',phone:l.phone||'',pn:normPhone(l.phone),email:normEmail(l.email),city:l.city||'',service:l.service||'',date:l.created_at,isEst:false,estTotal:0}); });
+    (estimates||[]).forEach(function(e){ var t=estTotals(e.items,e.tax_rate); recs.push({name:e.customer_name||'',phone:e.customer_phone||'',pn:normPhone(e.customer_phone),email:normEmail(e.customer_email),city:'',service:'',date:e.created_at,isEst:true,estTotal:t.total}); });
+    // Union-find: merge any records that share a phone OR an email (else fall back to name)
+    var parent=recs.map(function(_,i){return i;});
+    function find(i){ while(parent[i]!==i){ parent[i]=parent[parent[i]]; i=parent[i]; } return i; }
+    function union(a,b){ a=find(a); b=find(b); if(a!==b) parent[b]=a; }
+    var pMap={}, eMap={}, nMap={};
+    recs.forEach(function(r,i){
+      if(r.pn){ if(pMap[r.pn]!=null) union(pMap[r.pn],i); else pMap[r.pn]=i; }
+      if(r.email){ if(eMap[r.email]!=null) union(eMap[r.email],i); else eMap[r.email]=i; }
+      if(!r.pn && !r.email){ var nm=(r.name||'').toLowerCase().trim(); if(nm){ if(nMap[nm]!=null) union(nMap[nm],i); else nMap[nm]=i; } }
+    });
+    var groups={};
+    recs.forEach(function(r,i){ var g=find(i); (groups[g]=groups[g]||[]).push(r); });
+    customers=Object.keys(groups).map(function(k){
+      var arr=groups[k], c={name:'',phone:'',email:'',city:'',service:'',lastDate:null,estCount:0,estTotal:0};
+      arr.forEach(function(r){
+        if(!c.name && r.name) c.name=r.name;
+        if(!c.phone && r.phone) c.phone=r.phone;
+        if(!c.email && r.email) c.email=r.email;
+        if(!c.city && r.city) c.city=r.city;
+        if(!c.service && r.service) c.service=r.service;
+        if(r.date && (!c.lastDate || new Date(r.date)>new Date(c.lastDate))) c.lastDate=r.date;
+        if(r.isEst){ c.estCount++; c.estTotal+=r.estTotal||0; }
+      });
+      return c;
+    }).sort(function(a,b){ return new Date(b.lastDate||0)-new Date(a.lastDate||0); });
   }
   async function loadCustomers(){
     if(!sb) return;
