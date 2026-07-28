@@ -164,6 +164,7 @@ a{color:var(--blue)}
   <div class="tabs">
     <button class="tab active" id="tab-pipeline">Pipeline</button>
     <button class="tab" id="tab-estimates">Estimates</button>
+    <button class="tab" id="tab-customers">Customers</button>
   </div>
 
   <div id="view-pipeline">
@@ -188,6 +189,16 @@ a{color:var(--blue)}
       <button class="icon-btn" id="newEstBtn" style="background:var(--gold);color:#1a1a1a;border-color:var(--gold)">+ New Estimate</button>
     </div>
     <div class="est-list" id="estList"></div>
+  </div>
+
+  <div id="view-customers" hidden>
+    <div class="toolbar" style="justify-content:space-between;align-items:center">
+      <b style="font-size:1.05rem">Customers (<span id="custCount">0</span>)</b>
+    </div>
+    <div class="toolbar">
+      <input class="search" id="custSearch" placeholder="Search customers by name, phone, email, city…">
+    </div>
+    <div class="est-list" id="custList"></div>
   </div>
 </div>
 
@@ -442,17 +453,75 @@ a{color:var(--blue)}
     rate=Number(rate)||0; var tax=sub*rate/100; return {sub:sub, tax:tax, rate:rate, total:sub+tax};
   }
 
-  var tabPipeline=document.getElementById('tab-pipeline'), tabEstimates=document.getElementById('tab-estimates');
+  var tabPipeline=document.getElementById('tab-pipeline'), tabEstimates=document.getElementById('tab-estimates'), tabCustomers=document.getElementById('tab-customers');
   tabPipeline.addEventListener('click', function(){ switchView('pipeline'); });
   tabEstimates.addEventListener('click', function(){ switchView('estimates'); });
+  tabCustomers.addEventListener('click', function(){ switchView('customers'); });
   function switchView(v){
-    var pipe = v==='pipeline';
-    document.getElementById('view-pipeline').hidden = !pipe;
-    document.getElementById('view-estimates').hidden = pipe;
-    tabPipeline.classList.toggle('active', pipe);
-    tabEstimates.classList.toggle('active', !pipe);
-    if(!pipe) loadEstimates();
+    document.getElementById('view-pipeline').hidden = v!=='pipeline';
+    document.getElementById('view-estimates').hidden = v!=='estimates';
+    document.getElementById('view-customers').hidden = v!=='customers';
+    tabPipeline.classList.toggle('active', v==='pipeline');
+    tabEstimates.classList.toggle('active', v==='estimates');
+    tabCustomers.classList.toggle('active', v==='customers');
+    if(v==='estimates') loadEstimates();
+    if(v==='customers') loadCustomers();
   }
+
+  // ---- Customers (auto-built from leads + estimates) ----
+  var customers = [];
+  function custKey(name, phone, email){
+    var ph=(phone||'').replace(/\D/g,'');
+    if(ph.length>=7) return 'p:'+ph;
+    if(email) return 'e:'+email.toLowerCase().trim();
+    var nm=(name||'').toLowerCase().trim();
+    return nm?'n:'+nm:'';
+  }
+  function buildCustomers(){
+    var map={};
+    function add(rec){
+      var key=custKey(rec.name, rec.phone, rec.email);
+      if(!key) return;
+      var c=map[key];
+      if(!c){ c={name:rec.name||'',phone:rec.phone||'',email:rec.email||'',city:rec.city||'',service:rec.service||'',lastDate:rec.date,estCount:0,estTotal:0}; map[key]=c; }
+      if(!c.name && rec.name) c.name=rec.name;
+      if(!c.phone && rec.phone) c.phone=rec.phone;
+      if(!c.email && rec.email) c.email=rec.email;
+      if(!c.city && rec.city) c.city=rec.city;
+      if(!c.service && rec.service) c.service=rec.service;
+      if(rec.date && (!c.lastDate || new Date(rec.date)>new Date(c.lastDate))) c.lastDate=rec.date;
+      if(rec.isEst){ c.estCount++; c.estTotal+=rec.estTotal||0; }
+    }
+    (leads||[]).forEach(function(l){ add({name:l.name,phone:l.phone,email:l.email,city:l.city,service:l.service,date:l.created_at,isEst:false}); });
+    (estimates||[]).forEach(function(e){ var t=estTotals(e.items,e.tax_rate); add({name:e.customer_name,phone:e.customer_phone,email:e.customer_email,date:e.created_at,isEst:true,estTotal:t.total}); });
+    customers=Object.keys(map).map(function(k){return map[k];}).sort(function(a,b){ return new Date(b.lastDate||0)-new Date(a.lastDate||0); });
+  }
+  async function loadCustomers(){
+    if(!sb) return;
+    var er=await sb.from('estimates').select('*'); if(!er.error) estimates=er.data||[];
+    var lr=await sb.from('leads').select('*'); if(!lr.error) leads=lr.data||[];
+    buildCustomers(); renderCustomers();
+  }
+  function renderCustomers(){
+    var wrap=document.getElementById('custList');
+    var q=(document.getElementById('custSearch').value||'').toLowerCase().trim();
+    var list=customers.filter(function(c){ return !q || (c.name+' '+c.phone+' '+c.email+' '+c.city+' '+c.service).toLowerCase().indexOf(q)>=0; });
+    document.getElementById('custCount').textContent=customers.length;
+    if(!list.length){ wrap.innerHTML='<div class="empty"><b>No customers yet</b>They’ll show up here automatically as you add leads and create estimates.</div>'; return; }
+    wrap.innerHTML='';
+    list.forEach(function(c){
+      var row=document.createElement('div'); row.className='est-row';
+      var meta=[c.phone,c.email,c.city].filter(Boolean).map(esc).join(' · ');
+      var estInfo=c.estCount?(c.estCount+' estimate'+(c.estCount>1?'s':'')+' · '+money(c.estTotal)):'No estimates yet';
+      row.innerHTML=
+        '<div class="ec"><b>'+esc(c.name||'(no name)')+'</b><small>'+meta+'</small></div>'+
+        '<div class="etotal" style="font-size:.85rem;color:var(--slate);font-weight:600">'+esc(estInfo)+'</div>'+
+        '<div class="ebtns"><button class="mini" data-act="est">New Estimate</button></div>';
+      row.querySelector('[data-act="est"]').addEventListener('click', function(){ openEstimateModal({name:c.name,phone:c.phone,email:c.email}); });
+      wrap.appendChild(row);
+    });
+  }
+  document.getElementById('custSearch').addEventListener('input', renderCustomers);
 
   async function loadEstimates(){
     if(!sb) return;
@@ -500,6 +569,7 @@ a{color:var(--blue)}
     modal.classList.add('wide');
     modal.innerHTML =
       '<h3>New Estimate</h3>'+
+      '<div class="fld"><label>Use a saved customer (optional)</label><input id="e-pick" list="e-custlist" placeholder="Start typing a name to autofill…" autocomplete="off"><datalist id="e-custlist"></datalist></div>'+
       '<div class="row2">'+
         '<div class="fld"><label>Customer Name *</label><input id="e-name" value="'+esc(lead?lead.name:'')+'"></div>'+
         '<div class="fld"><label>Phone</label><input id="e-phone" value="'+esc(lead?lead.phone:'')+'"></div>'+
@@ -518,6 +588,17 @@ a{color:var(--blue)}
         '<button class="btn btn-primary" id="e-save" style="flex:1">Create &amp; Get Link</button>'+
       '</div>';
     modalBg.classList.add('open');
+
+    // Saved-customer autofill: build the list from current leads + estimates
+    buildCustomers();
+    var byName={}; customers.forEach(function(c){ byName[(c.name||'').toLowerCase().trim()]=c; });
+    var dl=document.getElementById('e-custlist');
+    if(dl) dl.innerHTML=customers.map(function(c){ return '<option value="'+esc(c.name||'')+'">'; }).join('');
+    var pick=document.getElementById('e-pick');
+    if(pick) pick.addEventListener('input', function(){
+      var c=byName[this.value.toLowerCase().trim()];
+      if(c){ document.getElementById('e-name').value=c.name||''; document.getElementById('e-phone').value=c.phone||''; document.getElementById('e-email').value=c.email||''; }
+    });
 
     var itemsWrap=document.getElementById('e-items');
     function renderItems(){
