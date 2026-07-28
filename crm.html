@@ -448,6 +448,7 @@ a{color:var(--blue)}
 
   function estLink(id){ return new URL('estimate.html?id='+id, location.href).href; }
   function money(n){ n=Number(n)||0; return '$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  function estNoFmt(n){ return n?('#'+String(n).padStart(4,'0')):'#—'; }
   function estTotals(items, rate){
     var sub=0; (items||[]).forEach(function(it){ sub += (Number(it.qty)||0)*(Number(it.unit_price)||0); });
     rate=Number(rate)||0; var tax=sub*rate/100; return {sub:sub, tax:tax, rate:rate, total:sub+tax};
@@ -476,7 +477,7 @@ a{color:var(--blue)}
     // Collect every record from leads + estimates
     var recs=[];
     (leads||[]).forEach(function(l){ recs.push({name:l.name||'',phone:l.phone||'',pn:normPhone(l.phone),email:normEmail(l.email),city:l.city||'',service:l.service||'',date:l.created_at,isEst:false,estTotal:0}); });
-    (estimates||[]).forEach(function(e){ var t=estTotals(e.items,e.tax_rate); recs.push({name:e.customer_name||'',phone:e.customer_phone||'',pn:normPhone(e.customer_phone),email:normEmail(e.customer_email),city:'',service:'',date:e.created_at,isEst:true,estTotal:t.total}); });
+    (estimates||[]).forEach(function(e){ var t=estTotals(e.items,e.tax_rate); recs.push({name:e.customer_name||'',phone:e.customer_phone||'',pn:normPhone(e.customer_phone),email:normEmail(e.customer_email),city:'',service:'',date:e.created_at,isEst:true,estTotal:t.total,raw:e}); });
     // Union-find: merge any records that share a phone OR an email (else fall back to name)
     var parent=recs.map(function(_,i){return i;});
     function find(i){ while(parent[i]!==i){ parent[i]=parent[parent[i]]; i=parent[i]; } return i; }
@@ -490,7 +491,7 @@ a{color:var(--blue)}
     var groups={};
     recs.forEach(function(r,i){ var g=find(i); (groups[g]=groups[g]||[]).push(r); });
     customers=Object.keys(groups).map(function(k){
-      var arr=groups[k], c={name:'',phone:'',email:'',city:'',service:'',lastDate:null,estCount:0,estTotal:0};
+      var arr=groups[k], c={name:'',phone:'',email:'',city:'',service:'',lastDate:null,estCount:0,estTotal:0,estRows:[]};
       arr.forEach(function(r){
         if(!c.name && r.name) c.name=r.name;
         if(!c.phone && r.phone) c.phone=r.phone;
@@ -498,8 +499,9 @@ a{color:var(--blue)}
         if(!c.city && r.city) c.city=r.city;
         if(!c.service && r.service) c.service=r.service;
         if(r.date && (!c.lastDate || new Date(r.date)>new Date(c.lastDate))) c.lastDate=r.date;
-        if(r.isEst){ c.estCount++; c.estTotal+=r.estTotal||0; }
+        if(r.isEst){ c.estCount++; c.estTotal+=r.estTotal||0; if(r.raw) c.estRows.push(r.raw); }
       });
+      c.estRows.sort(function(a,b){ return new Date(b.created_at)-new Date(a.created_at); });
       return c;
     }).sort(function(a,b){ return new Date(b.lastDate||0)-new Date(a.lastDate||0); });
   }
@@ -517,18 +519,58 @@ a{color:var(--blue)}
     if(!list.length){ wrap.innerHTML='<div class="empty"><b>No customers yet</b>They’ll show up here automatically as you add leads and create estimates.</div>'; return; }
     wrap.innerHTML='';
     list.forEach(function(c){
-      var row=document.createElement('div'); row.className='est-row';
+      var row=document.createElement('div'); row.className='est-row'; row.style.cursor='pointer';
       var meta=[c.phone,c.email,c.city].filter(Boolean).map(esc).join(' · ');
       var estInfo=c.estCount?(c.estCount+' estimate'+(c.estCount>1?'s':'')+' · '+money(c.estTotal)):'No estimates yet';
       row.innerHTML=
         '<div class="ec"><b>'+esc(c.name||'(no name)')+'</b><small>'+meta+'</small></div>'+
         '<div class="etotal" style="font-size:.85rem;color:var(--slate);font-weight:600">'+esc(estInfo)+'</div>'+
-        '<div class="ebtns"><button class="mini" data-act="est">New Estimate</button></div>';
-      row.querySelector('[data-act="est"]').addEventListener('click', function(){ openEstimateModal({name:c.name,phone:c.phone,email:c.email}); });
+        '<div class="ebtns"><button class="mini" data-act="view">View</button><button class="mini" data-act="est">New Estimate</button></div>';
+      row.addEventListener('click', function(){ openCustomerModal(c); });
+      row.querySelector('[data-act="view"]').addEventListener('click', function(ev){ ev.stopPropagation(); openCustomerModal(c); });
+      row.querySelector('[data-act="est"]').addEventListener('click', function(ev){ ev.stopPropagation(); openEstimateModal({name:c.name,phone:c.phone,email:c.email}); });
       wrap.appendChild(row);
     });
   }
   document.getElementById('custSearch').addEventListener('input', renderCustomers);
+
+  function openCustomerModal(c){
+    modal.classList.remove('wide');
+    var meta=[c.phone,c.email,c.city].filter(Boolean).map(esc).join(' · ');
+    var rowsHtml;
+    if(!c.estRows || !c.estRows.length){
+      rowsHtml='<p style="color:var(--slate)">No estimates for this customer yet.</p>';
+    } else {
+      rowsHtml=c.estRows.map(function(e){
+        var t=estTotals(e.items,e.tax_rate);
+        return '<div class="est-row" style="cursor:default">'+
+          '<div class="ec"><b>'+estNoFmt(e.estimate_no)+'</b><small>'+fmtDate(e.created_at)+'</small></div>'+
+          '<div class="etotal">'+money(t.total)+'</div>'+
+          '<span class="est-status '+e.status+'">'+e.status+'</span>'+
+          '<div class="ebtns">'+
+            '<a class="mini" href="'+estLink(e.id)+'" target="_blank">Open</a>'+
+            '<button class="mini" data-copy="'+e.id+'">Copy Link</button>'+
+          '</div>'+
+        '</div>';
+      }).join('');
+    }
+    modal.innerHTML=
+      '<h3>'+esc(c.name||'Customer')+'</h3>'+
+      (meta?'<p style="color:var(--slate);margin-top:-6px">'+meta+'</p>':'')+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin:10px 0 6px"><b>Estimates ('+(c.estRows?c.estRows.length:0)+')</b>'+
+        '<button class="icon-btn" id="cust-new" style="background:var(--gold);color:#1a1a1a;border-color:var(--gold)">+ New Estimate</button></div>'+
+      '<div class="est-list">'+rowsHtml+'</div>'+
+      '<div class="modal-actions"><button class="btn btn-ghost" id="cust-close" style="flex:1">Close</button></div>';
+    modalBg.classList.add('open');
+    document.getElementById('cust-close').addEventListener('click', function(){ modalBg.classList.remove('open'); });
+    document.getElementById('cust-new').addEventListener('click', function(){ openEstimateModal({name:c.name,phone:c.phone,email:c.email}); });
+    modal.querySelectorAll('[data-copy]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var link=estLink(this.getAttribute('data-copy')), self=this;
+        navigator.clipboard.writeText(link).then(function(){ self.textContent='Copied!'; setTimeout(function(){ self.textContent='Copy Link'; },1500); }, function(){ prompt('Copy this link:', link); });
+      });
+    });
+  }
 
   async function loadEstimates(){
     if(!sb) return;
@@ -546,7 +588,7 @@ a{color:var(--blue)}
       var t=estTotals(e.items, e.tax_rate);
       var row=document.createElement('div'); row.className='est-row';
       row.innerHTML =
-        '<div class="ec"><b>'+esc(e.customer_name)+'</b><small>'+fmtDate(e.created_at)+(e.customer_phone?' · '+esc(e.customer_phone):'')+'</small></div>'+
+        '<div class="ec"><b>'+estNoFmt(e.estimate_no)+' · '+esc(e.customer_name)+'</b><small>'+fmtDate(e.created_at)+(e.customer_phone?' · '+esc(e.customer_phone):'')+'</small></div>'+
         '<div class="etotal">'+money(t.total)+'</div>'+
         '<span class="est-status '+e.status+'">'+e.status+'</span>'+
         '<div class="ebtns">'+

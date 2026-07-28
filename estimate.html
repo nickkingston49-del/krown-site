@@ -133,7 +133,8 @@
     est = e;
     var t = totals(e);
     var d = e.created_at ? new Date(e.created_at) : new Date();
-    $('headMeta').textContent = 'Estimate #' + String(e.id).slice(0, 8).toUpperCase() +
+    var estNo = e.estimate_no ? String(e.estimate_no).padStart(4, '0') : String(e.id).slice(0, 8).toUpperCase();
+    $('headMeta').textContent = 'Estimate #' + estNo +
       ' · ' + d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
     var badge = $('statusBadge');
