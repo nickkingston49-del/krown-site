@@ -444,9 +444,11 @@ a{color:var(--blue)}
   });
 
   // ================= ESTIMATES =================
-  var estimates = [], estChannelSubscribed = false;
+  var estimates = [], estChannelSubscribed = false, payments = [];
 
   function estLink(id){ return new URL('estimate.html?id='+id, location.href).href; }
+  function rcptLink(id){ return new URL('receipt.html?id='+id, location.href).href; }
+  function paidFor(estId){ return payments.filter(function(p){return p.estimate_id===estId;}).reduce(function(s,p){return s+(Number(p.amount)||0);},0); }
   function money(n){ n=Number(n)||0; return '$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
   function estNoFmt(n){ return n?('#'+String(n).padStart(4,'0')):'#—'; }
   function estTotals(items, rate){
@@ -509,6 +511,7 @@ a{color:var(--blue)}
     if(!sb) return;
     var er=await sb.from('estimates').select('*'); if(!er.error) estimates=er.data||[];
     var lr=await sb.from('leads').select('*'); if(!lr.error) leads=lr.data||[];
+    await loadPayments();
     buildCustomers(); renderCustomers();
   }
   function renderCustomers(){
@@ -545,9 +548,11 @@ a{color:var(--blue)}
         var t=estTotals(e.items,e.tax_rate);
         return '<div class="est-row" style="cursor:default">'+
           '<div class="ec"><b>'+estNoFmt(e.estimate_no)+'</b><small>'+fmtDate(e.created_at)+'</small></div>'+
-          '<div class="etotal">'+money(t.total)+'</div>'+
+          '<div class="etotal">'+money(t.total)+payChip(e,t)+'</div>'+
           '<span class="est-status '+e.status+'">'+e.status+'</span>'+
           '<div class="ebtns">'+
+            '<button class="mini" data-pay="'+e.id+'">$ Payments</button>'+
+            '<button class="mini" data-edit="'+e.id+'">Edit</button>'+
             '<a class="mini" href="'+estLink(e.id)+'" target="_blank">Open</a>'+
             '<button class="mini" data-copy="'+e.id+'">Copy Link</button>'+
           '</div>'+
@@ -570,13 +575,22 @@ a{color:var(--blue)}
         navigator.clipboard.writeText(link).then(function(){ self.textContent='Copied!'; setTimeout(function(){ self.textContent='Copy Link'; },1500); }, function(){ prompt('Copy this link:', link); });
       });
     });
+    function estById(id){ return (c.estRows||[]).filter(function(x){return x.id===id;})[0]; }
+    modal.querySelectorAll('[data-edit]').forEach(function(btn){ btn.addEventListener('click', function(){ var e=estById(this.getAttribute('data-edit')); if(e) openEstimateModal(null, e); }); });
+    modal.querySelectorAll('[data-pay]').forEach(function(btn){ btn.addEventListener('click', function(){ var e=estById(this.getAttribute('data-pay')); if(e) openPaymentsModal(e); }); });
   }
 
+  async function loadPayments(){
+    if(!sb) return;
+    var pr = await sb.from('payments').select('*');
+    if(!pr.error) payments = pr.data||[];
+  }
   async function loadEstimates(){
     if(!sb) return;
     var res = await sb.from('estimates').select('*').order('created_at',{ascending:false});
     if(res.error){ console.error(res.error); return; }
     estimates = res.data||[];
+    await loadPayments();
     renderEstimates();
   }
 
@@ -589,13 +603,17 @@ a{color:var(--blue)}
       var row=document.createElement('div'); row.className='est-row';
       row.innerHTML =
         '<div class="ec"><b>'+estNoFmt(e.estimate_no)+' · '+esc(e.customer_name)+'</b><small>'+fmtDate(e.created_at)+(e.customer_phone?' · '+esc(e.customer_phone):'')+'</small></div>'+
-        '<div class="etotal">'+money(t.total)+'</div>'+
+        '<div class="etotal">'+money(t.total)+payChip(e,t)+'</div>'+
         '<span class="est-status '+e.status+'">'+e.status+'</span>'+
         '<div class="ebtns">'+
+          '<button class="mini" data-act="pay">$ Payments</button>'+
+          '<button class="mini" data-act="edit">Edit</button>'+
           '<button class="mini" data-act="copy">Copy Link</button>'+
           '<a class="mini" href="'+estLink(e.id)+'" target="_blank">Open</a>'+
           '<button class="mini danger" data-act="del">Delete</button>'+
         '</div>';
+      row.querySelector('[data-act="pay"]').addEventListener('click', function(){ openPaymentsModal(e); });
+      row.querySelector('[data-act="edit"]').addEventListener('click', function(){ openEstimateModal(null, e); });
       row.querySelector('[data-act="copy"]').addEventListener('click', function(){
         var link=estLink(e.id), self=this;
         navigator.clipboard.writeText(link).then(function(){ self.textContent='Copied!'; setTimeout(function(){ self.textContent='Copy Link'; },1500); }, function(){ prompt('Copy this link:', link); });
@@ -611,30 +629,100 @@ a{color:var(--blue)}
     });
   }
 
+  // Small paid/balance chip shown next to an estimate total
+  function payChip(e, t){
+    var paid=paidFor(e.id); if(paid<=0) return '';
+    var bal=(t.total)-paid;
+    if(bal<=0.005) return '<div style="font-size:.72rem;font-weight:700;color:var(--won);margin-top:2px">PAID IN FULL</div>';
+    return '<div style="font-size:.72rem;font-weight:600;color:var(--slate);margin-top:2px">Paid '+money(paid)+' · Bal '+money(bal)+'</div>';
+  }
+
+  // Payments: view + record payments, with per-payment receipt links
+  async function openPaymentsModal(e){
+    if(!sb) return;
+    modal.classList.remove('wide');
+    var pr=await sb.from('payments').select('*').eq('estimate_id', e.id).order('paid_on',{ascending:false}).order('created_at',{ascending:false});
+    var list=pr.error?[]:(pr.data||[]);
+    // keep global cache fresh so chips update
+    payments = payments.filter(function(p){return p.estimate_id!==e.id;}).concat(list);
+    var t=estTotals(e.items, e.tax_rate);
+    var paid=list.reduce(function(s,p){return s+(Number(p.amount)||0);},0);
+    var bal=t.total-paid;
+    var rowsHtml;
+    if(!list.length){ rowsHtml='<p style="color:var(--slate)">No payments recorded yet.</p>'; }
+    else {
+      rowsHtml=list.map(function(p){
+        return '<div class="est-row" style="cursor:default">'+
+          '<div class="ec"><b>'+money(p.amount)+(p.method?' · '+esc(p.method):'')+'</b><small>'+esc(p.paid_on||'')+(p.note?' · '+esc(p.note):'')+'</small></div>'+
+          '<div class="ebtns">'+
+            '<a class="mini" href="'+rcptLink(p.id)+'" target="_blank">Receipt</a>'+
+            '<button class="mini" data-rc="'+p.id+'">Copy</button>'+
+            '<button class="mini danger" data-pd="'+p.id+'">Delete</button>'+
+          '</div></div>';
+      }).join('');
+    }
+    var today=new Date().toISOString().slice(0,10);
+    modal.innerHTML=
+      '<h3>Payments — '+estNoFmt(e.estimate_no)+'</h3>'+
+      '<p style="color:var(--slate);margin-top:-6px">'+esc(e.customer_name)+'</p>'+
+      '<div class="est-totline"><span>Estimate Total</span><span>'+money(t.total)+'</span></div>'+
+      '<div class="est-totline"><span>Paid</span><span>'+money(paid)+'</span></div>'+
+      '<div class="est-totline grand"><span>Balance Due</span><span style="color:'+(bal<=0.005?'var(--won)':'var(--navy)')+'">'+money(Math.max(0,bal))+(bal<=0.005&&t.total>0?' ✓':'')+'</span></div>'+
+      '<div style="margin:14px 0 6px"><b>Payments ('+list.length+')</b></div>'+
+      '<div class="est-list">'+rowsHtml+'</div>'+
+      '<div style="border-top:1px solid var(--line);margin-top:14px;padding-top:12px"><b>Record a payment</b>'+
+        '<div class="row2" style="margin-top:8px">'+
+          '<div class="fld"><label>Amount</label><input id="p-amt" type="number" min="0" step="0.01" placeholder="'+(bal>0?bal.toFixed(2):'0.00')+'"></div>'+
+          '<div class="fld"><label>Method</label><select id="p-method"><option>Cash</option><option>Check</option><option>Card</option><option>Bank Transfer</option><option>Other</option></select></div>'+
+        '</div>'+
+        '<div class="row2">'+
+          '<div class="fld"><label>Date</label><input id="p-date" type="date" value="'+today+'"></div>'+
+          '<div class="fld"><label>Note (optional)</label><input id="p-note" placeholder="e.g. deposit, final"></div>'+
+        '</div>'+
+        '<button class="btn btn-primary" id="p-save" style="width:100%;margin-top:6px">Record Payment</button>'+
+      '</div>'+
+      '<div class="modal-actions"><button class="btn btn-ghost" id="p-close" style="flex:1">Close</button></div>';
+    modalBg.classList.add('open');
+    document.getElementById('p-close').addEventListener('click', function(){ modalBg.classList.remove('open'); if(!document.getElementById('view-estimates').hidden) renderEstimates(); });
+    document.getElementById('p-save').addEventListener('click', async function(){
+      var amt=Number(document.getElementById('p-amt').value);
+      if(!(amt>0)){ alert('Enter a payment amount.'); return; }
+      var self=this; self.disabled=true; self.textContent='Saving…';
+      var res=await sb.from('payments').insert([{ estimate_id:e.id, amount:amt, method:document.getElementById('p-method').value, paid_on:document.getElementById('p-date').value||today, note:document.getElementById('p-note').value.trim()||null }]);
+      if(res.error){ alert('Could not save: '+res.error.message); self.disabled=false; self.textContent='Record Payment'; return; }
+      openPaymentsModal(e);
+    });
+    modal.querySelectorAll('[data-rc]').forEach(function(b){ b.addEventListener('click', function(){ var link=rcptLink(this.getAttribute('data-rc')), self=this; navigator.clipboard.writeText(link).then(function(){ self.textContent='Copied!'; setTimeout(function(){ self.textContent='Copy'; },1500); }, function(){ prompt('Copy this link:', link); }); }); });
+    modal.querySelectorAll('[data-pd]').forEach(function(b){ b.addEventListener('click', async function(){ if(!confirm('Delete this payment?')) return; var id=this.getAttribute('data-pd'); var res=await sb.from('payments').delete().eq('id', id); if(res.error){ alert('Could not delete: '+res.error.message); return; } openPaymentsModal(e); }); });
+  }
+
   document.getElementById('newEstBtn').addEventListener('click', function(){ openEstimateModal(null); });
 
-  function openEstimateModal(lead){
-    var items=[{description:'',qty:1,unit_price:''}];
+  function openEstimateModal(lead, editing){
+    var pf = editing ? {name:editing.customer_name, phone:editing.customer_phone, email:editing.customer_email} : (lead||{});
+    var items = (editing && Array.isArray(editing.items) && editing.items.length)
+      ? editing.items.map(function(it){ return {description:it.description||'', qty:(it.qty!=null?it.qty:1), unit_price:(it.unit_price!=null?it.unit_price:'')}; })
+      : [{description:'',qty:1,unit_price:''}];
     modal.classList.add('wide');
     modal.innerHTML =
-      '<h3>New Estimate</h3>'+
-      '<div class="fld"><label>Use a saved customer (optional)</label><input id="e-pick" list="e-custlist" placeholder="Start typing a name to autofill…" autocomplete="off"><datalist id="e-custlist"></datalist></div>'+
+      '<h3>'+(editing?'Edit Estimate '+estNoFmt(editing.estimate_no):'New Estimate')+'</h3>'+
+      (editing?'':'<div class="fld"><label>Use a saved customer (optional)</label><input id="e-pick" list="e-custlist" placeholder="Start typing a name to autofill…" autocomplete="off"><datalist id="e-custlist"></datalist></div>')+
       '<div class="row2">'+
-        '<div class="fld"><label>Customer Name *</label><input id="e-name" value="'+esc(lead?lead.name:'')+'"></div>'+
-        '<div class="fld"><label>Phone</label><input id="e-phone" value="'+esc(lead?lead.phone:'')+'"></div>'+
+        '<div class="fld"><label>Customer Name *</label><input id="e-name" value="'+esc(pf.name||'')+'"></div>'+
+        '<div class="fld"><label>Phone</label><input id="e-phone" value="'+esc(pf.phone||'')+'"></div>'+
       '</div>'+
-      '<div class="fld"><label>Email</label><input id="e-email" value="'+esc(lead&&lead.email?lead.email:'')+'"></div>'+
+      '<div class="fld"><label>Email</label><input id="e-email" value="'+esc(pf.email||'')+'"></div>'+
       '<div class="fld"><label>Line Items</label><div id="e-items"></div>'+
         '<button class="icon-btn" id="e-additem" type="button" style="margin-top:4px">+ Add line</button></div>'+
       '<div class="row2">'+
-        '<div class="fld"><label>Tax Rate (%)</label><input id="e-tax" type="number" step="0.01" value="0"></div>'+
+        '<div class="fld"><label>Tax Rate (%)</label><input id="e-tax" type="number" step="0.01" value="'+(editing?(Number(editing.tax_rate)||0):0)+'"></div>'+
         '<div class="fld"></div>'+
       '</div>'+
       '<div id="e-tot" style="margin:4px 0 8px"></div>'+
-      '<div class="fld"><label>Note to Customer</label><textarea id="e-notes" placeholder="Scope, timeline, terms…"></textarea></div>'+
+      '<div class="fld"><label>Note to Customer</label><textarea id="e-notes" placeholder="Scope, timeline, terms…">'+esc(editing&&editing.notes?editing.notes:'')+'</textarea></div>'+
       '<div class="modal-actions">'+
         '<button class="btn btn-ghost" id="e-cancel">Cancel</button>'+
-        '<button class="btn btn-primary" id="e-save" style="flex:1">Create &amp; Get Link</button>'+
+        '<button class="btn btn-primary" id="e-save" style="flex:1">'+(editing?'Save Changes':'Create &amp; Get Link')+'</button>'+
       '</div>';
     modalBg.classList.add('open');
 
@@ -683,18 +771,28 @@ a{color:var(--blue)}
         .map(function(it){ return {description:(it.description||'').trim(), qty:Number(it.qty)||0, unit_price:Number(it.unit_price)||0}; });
       if(!clean.length){ alert('Add at least one line item.'); return; }
       var btn=document.getElementById('e-save'); btn.disabled=true; btn.textContent='Saving…';
-      var res=await sb.from('estimates').insert([{
+      var fields={
         customer_name:name,
         customer_phone:document.getElementById('e-phone').value.trim()||null,
         customer_email:document.getElementById('e-email').value.trim()||null,
         items:clean,
         tax_rate:Number(document.getElementById('e-tax').value)||0,
-        notes:document.getElementById('e-notes').value.trim()||null,
-        status:'Sent'
-      }]).select();
-      btn.disabled=false; btn.textContent='Create & Get Link';
-      if(res.error){ alert('Could not save: '+res.error.message); return; }
-      showEstimateLink(res.data[0]);
+        notes:document.getElementById('e-notes').value.trim()||null
+      };
+      if(editing){
+        var ur=await sb.from('estimates').update(fields).eq('id', editing.id);
+        btn.disabled=false; btn.textContent='Save Changes';
+        if(ur.error){ alert('Could not save: '+ur.error.message); return; }
+        modal.classList.remove('wide'); modalBg.classList.remove('open');
+        if(!document.getElementById('view-estimates').hidden) loadEstimates();
+        if(!document.getElementById('view-customers').hidden) loadCustomers();
+      } else {
+        fields.status='Sent';
+        var res=await sb.from('estimates').insert([fields]).select();
+        btn.disabled=false; btn.textContent='Create & Get Link';
+        if(res.error){ alert('Could not save: '+res.error.message); return; }
+        showEstimateLink(res.data[0]);
+      }
     });
   }
 

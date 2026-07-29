@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Payment Receipt | Krown Roofing and Construction</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#2a47c7">
+<link rel="icon" type="image/png" href="assets/logo.webp">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  body{background:#eef1f8}
+  .rc-topbar{background:#fff;border-bottom:1px solid var(--line);box-shadow:0 2px 12px rgba(27,42,107,.05)}
+  .rc-topbar .wrap{display:flex;align-items:center;justify-content:space-between;padding:12px 22px;gap:14px}
+  .rc-topbar img{height:46px;width:auto}
+  .rc-topbar a.phone{font-weight:700;color:var(--blue);white-space:nowrap}
+  .rc-shell{max-width:760px;margin:26px auto 60px;padding:0 18px}
+  .rc-card{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
+  .rc-head{background:linear-gradient(135deg,var(--blue),var(--blue-deep));color:#fff;padding:26px 28px}
+  .rc-head h1{color:#fff;font-size:1.5rem;margin:0 0 4px}
+  .rc-head .meta{color:rgba(255,255,255,.9);font-size:.95rem}
+  .rc-badge{display:inline-block;margin-top:12px;padding:5px 14px;border-radius:999px;font-weight:700;font-size:.82rem;background:rgba(46,204,113,.28);color:#fff}
+  .rc-body{padding:26px 28px}
+  .rc-label{font-weight:700;color:var(--blue-ink);font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;margin:0 0 8px}
+  .rc-cust{color:var(--slate);font-size:.98rem;margin-bottom:22px;line-height:1.5}
+  .rc-amount{background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:20px;text-align:center;margin-bottom:22px}
+  .rc-amount .big{font-size:2.1rem;font-weight:800;color:var(--blue-ink);line-height:1.1}
+  .rc-amount .sub{color:var(--slate);font-size:.9rem;margin-top:4px}
+  .rc-lines{width:100%;border-collapse:collapse;margin-bottom:6px}
+  .rc-lines td{padding:9px 6px;border-bottom:1px solid var(--line);font-size:.97rem;color:var(--ink)}
+  .rc-lines td.lbl{color:var(--slate);width:45%}
+  .rc-lines td.num{text-align:right;white-space:nowrap}
+  .rc-lines tr.grand td{border-bottom:none;border-top:2px solid var(--line);padding-top:12px;font-size:1.15rem;font-weight:800;color:var(--blue-ink)}
+  .rc-paidfull{color:#1b7a43}
+  .rc-actions{padding:22px 28px 28px;border-top:1px solid var(--line);display:flex;gap:14px}
+  .rc-actions .btn{flex:1;justify-content:center}
+  .rc-msg{max-width:760px;margin:60px auto;text-align:center;color:var(--slate);font-size:1.05rem}
+  .rc-foot{text-align:center;color:var(--slate);font-size:.86rem;margin-top:22px}
+  @media print{
+    body{background:#fff}
+    .rc-topbar,.rc-actions,.rc-foot{display:none!important}
+    .rc-shell{margin:0;max-width:100%}
+    .rc-card{border:none;box-shadow:none}
+    .rc-head{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
+</style>
+</head>
+<body>
+
+<div class="rc-topbar">
+  <div class="wrap">
+    <a href="index.html" aria-label="Krown Roofing and Construction"><img src="assets/logo.webp" alt="Krown Roofing and Construction"></a>
+    <a class="phone" href="tel:+14097192053">(409) 719-2053</a>
+  </div>
+</div>
+
+<div class="rc-shell">
+  <div id="loading" class="rc-msg">Loading receipt…</div>
+  <div id="notfound" class="rc-msg" hidden>Sorry, we couldn't find this receipt. Please check your link or call us at <a href="tel:+14097192053">(409) 719-2053</a>.</div>
+
+  <div id="receipt" hidden>
+    <div class="rc-card">
+      <div class="rc-head">
+        <h1>Payment Receipt</h1>
+        <div class="meta" id="headMeta"></div>
+        <span class="rc-badge">PAYMENT RECEIVED</span>
+      </div>
+      <div class="rc-body">
+        <p class="rc-label">Received from</p>
+        <div class="rc-cust" id="custBlock"></div>
+
+        <div class="rc-amount">
+          <div class="big" id="amtBig"></div>
+          <div class="sub" id="amtSub"></div>
+        </div>
+
+        <table class="rc-lines">
+          <tbody id="linesBody"></tbody>
+        </table>
+      </div>
+      <div class="rc-actions">
+        <a class="btn btn-gold" id="printBtn" href="javascript:void(0)">Print / Save as PDF</a>
+      </div>
+    </div>
+    <p class="rc-foot">Thank you for your business! Questions? Call or text Krown at (409) 719-2053.</p>
+  </div>
+</div>
+
+<script src="assets/config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var id = new URLSearchParams(location.search).get('id');
+  var sb = (window.KROWN_READY && window.supabase)
+    ? window.supabase.createClient(KROWN_CONFIG.SUPABASE_URL, KROWN_CONFIG.SUPABASE_ANON_KEY)
+    : null;
+
+  function money(n) { n = Number(n) || 0; return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function estTotal(e) {
+    var items = Array.isArray(e.items) ? e.items : [];
+    var sub = 0; items.forEach(function (it) { sub += (Number(it.qty) || 0) * (Number(it.unit_price) || 0); });
+    var rate = Number(e.tax_rate) || 0;
+    return sub + sub * rate / 100;
+  }
+  function fmtDate(s) {
+    if (!s) return '';
+    var d = new Date(s.length <= 10 ? s + 'T00:00:00' : s);
+    return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  }
+
+  function render(data) {
+    var p = data.payment, e = data.estimate;
+    var total = estTotal(e);
+    var totalPaid = Number(data.total_paid) || 0;
+    var balance = total - totalPaid;
+    var estNo = e.estimate_no ? String(e.estimate_no).padStart(4, '0') : String(e.id).slice(0, 8).toUpperCase();
+
+    $('headMeta').textContent = 'Receipt for Estimate #' + estNo + ' · ' + fmtDate(p.paid_on || p.created_at);
+
+    var cust = '<strong style="color:var(--blue-ink)">' + esc(e.customer_name) + '</strong>';
+    if (e.customer_phone) cust += '<br>' + esc(e.customer_phone);
+    if (e.customer_email) cust += '<br>' + esc(e.customer_email);
+    $('custBlock').innerHTML = cust;
+
+    $('amtBig').textContent = money(p.amount);
+    $('amtSub').textContent = 'Paid on ' + fmtDate(p.paid_on || p.created_at) + (p.method ? ' · ' + esc(p.method) : '');
+
+    var lines = '';
+    if (p.note) lines += '<tr><td class="lbl">Note</td><td class="num">' + esc(p.note) + '</td></tr>';
+    lines += '<tr><td class="lbl">Estimate total</td><td class="num">' + money(total) + '</td></tr>';
+    lines += '<tr><td class="lbl">Total paid to date</td><td class="num">' + money(totalPaid) + '</td></tr>';
+    if (balance <= 0.005) {
+      lines += '<tr class="grand"><td class="rc-paidfull">Balance due</td><td class="num rc-paidfull">' + money(0) + ' — Paid in full ✓</td></tr>';
+    } else {
+      lines += '<tr class="grand"><td>Balance due</td><td class="num">' + money(balance) + '</td></tr>';
+    }
+    $('linesBody').innerHTML = lines;
+
+    $('loading').hidden = true;
+    $('receipt').hidden = false;
+  }
+
+  async function load() {
+    if (!id || !sb) { $('loading').hidden = true; $('notfound').hidden = false; return; }
+    try {
+      var r = await sb.rpc('get_receipt', { p_id: id });
+      if (r.error) throw r.error;
+      var data = r.data;
+      if (!data || !data.payment || !data.estimate) { $('loading').hidden = true; $('notfound').hidden = false; return; }
+      render(data);
+    } catch (err) {
+      $('loading').hidden = true; $('notfound').hidden = false;
+    }
+  }
+
+  $('printBtn').addEventListener('click', function () { window.print(); });
+  load();
+})();
+</script>
+</body>
+</html>

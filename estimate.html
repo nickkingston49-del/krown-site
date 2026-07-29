@@ -87,6 +87,8 @@
           <div class="row"><span>Subtotal</span><span id="subtotal"></span></div>
           <div class="row" id="taxRow"><span id="taxLabel">Tax</span><span id="tax"></span></div>
           <div class="row total"><span>Total</span><span id="total"></span></div>
+          <div class="row" id="paidRow" style="display:none;color:#1b7a43;font-weight:600"><span>Paid</span><span id="paidAmt"></span></div>
+          <div class="row" id="balRow" style="display:none;font-weight:700;color:var(--blue-ink)"><span id="balLabel">Balance Due</span><span id="balAmt"></span></div>
         </div>
 
         <div class="est-notes" id="notesBlock" hidden></div>
@@ -221,6 +223,16 @@
     }
   }
 
+  function showPaid(paid, total) {
+    if (!(paid > 0)) return;
+    $('paidAmt').textContent = money(paid);
+    $('paidRow').style.display = 'flex';
+    var bal = total - paid;
+    if (bal <= 0.005) { $('balLabel').textContent = 'Balance Due'; $('balAmt').textContent = money(0) + ' — Paid in full ✓'; $('balRow').style.color = '#1b7a43'; }
+    else { $('balLabel').textContent = 'Balance Due'; $('balAmt').textContent = money(bal); }
+    $('balRow').style.display = 'flex';
+  }
+
   async function load() {
     if (!id || !sb) { $('loading').hidden = true; $('notfound').hidden = false; return; }
     try {
@@ -229,6 +241,10 @@
       var e = Array.isArray(r.data) ? r.data[0] : r.data;
       if (!e) { $('loading').hidden = true; $('notfound').hidden = false; return; }
       render(e);
+      try {
+        var pr = await sb.rpc('estimate_paid', { p_id: id });
+        if (!pr.error) showPaid(Number(pr.data) || 0, totals(e).total);
+      } catch (e2) {}
     } catch (err) {
       $('loading').hidden = true; $('notfound').hidden = false;
     }
