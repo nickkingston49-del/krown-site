@@ -653,7 +653,7 @@ a{color:var(--blue)}
     else {
       rowsHtml=list.map(function(p){
         return '<div class="est-row" style="cursor:default">'+
-          '<div class="ec"><b>'+money(p.amount)+(p.method?' · '+esc(p.method):'')+'</b><small>'+esc(p.paid_on||'')+(p.note?' · '+esc(p.note):'')+'</small></div>'+
+          '<div class="ec"><b>'+money(p.amount)+(p.method?' · '+esc(p.method):'')+'</b><small>'+esc(p.paid_on||'')+(p.note?' · '+esc(p.note):'')+'</small>'+(p.work_description?'<small style="color:var(--ink);margin-top:3px">'+esc(p.work_description)+'</small>':'')+'</div>'+
           '<div class="ebtns">'+
             '<a class="mini" href="'+rcptLink(p.id)+'" target="_blank">Receipt</a>'+
             '<button class="mini" data-rc="'+p.id+'">Copy</button>'+
@@ -677,8 +677,9 @@ a{color:var(--blue)}
         '</div>'+
         '<div class="row2">'+
           '<div class="fld"><label>Date</label><input id="p-date" type="date" value="'+today+'"></div>'+
-          '<div class="fld"><label>Note (optional)</label><input id="p-note" placeholder="e.g. deposit, final"></div>'+
+          '<div class="fld"><label>Note (internal)</label><input id="p-note" placeholder="e.g. deposit, final"></div>'+
         '</div>'+
+        '<div class="fld"><label>Work completed (shows on receipt)</label><textarea id="p-work" placeholder="Describe exactly what work was done — e.g. Full tear-off and replacement of 30 sq architectural shingle roof, new felt, drip edge, ridge vent, and full cleanup. Completed and inspected."></textarea></div>'+
         '<button class="btn btn-primary" id="p-save" style="width:100%;margin-top:6px">Record Payment</button>'+
       '</div>'+
       '<div class="modal-actions"><button class="btn btn-ghost" id="p-close" style="flex:1">Close</button></div>';
@@ -688,7 +689,7 @@ a{color:var(--blue)}
       var amt=Number(document.getElementById('p-amt').value);
       if(!(amt>0)){ alert('Enter a payment amount.'); return; }
       var self=this; self.disabled=true; self.textContent='Saving…';
-      var res=await sb.from('payments').insert([{ estimate_id:e.id, amount:amt, method:document.getElementById('p-method').value, paid_on:document.getElementById('p-date').value||today, note:document.getElementById('p-note').value.trim()||null }]);
+      var res=await sb.from('payments').insert([{ estimate_id:e.id, amount:amt, method:document.getElementById('p-method').value, paid_on:document.getElementById('p-date').value||today, note:document.getElementById('p-note').value.trim()||null, work_description:document.getElementById('p-work').value.trim()||null }]);
       if(res.error){ alert('Could not save: '+res.error.message); self.disabled=false; self.textContent='Record Payment'; return; }
       openPaymentsModal(e);
     });
