@@ -178,7 +178,6 @@ a{color:var(--blue)}
   <div id="view-pipeline">
   <div class="stats">
     <div class="stat b-new"><div class="n" id="st-new">0</div><div class="l">New</div></div>
-    <div class="stat b-week"><div class="n" id="st-week">0</div><div class="l">This Week</div></div>
     <div class="stat"><div class="n" id="st-open">0</div><div class="l">In Pipeline</div></div>
     <div class="stat b-won"><div class="n" id="st-won">0</div><div class="l">Won</div></div>
     <div class="stat"><div class="n" id="st-total">0</div><div class="l">Total Leads</div></div>
@@ -273,6 +272,8 @@ a{color:var(--blue)}
     document.getElementById('app').style.display='block';
     document.getElementById('whoami').textContent = user.email;
     loadLeads();
+    // Make sure every estimate/insurance customer has a lead profile, then refresh the board
+    ensureLeadsFromCustomers().then(function(created){ if(created) loadLeads(); });
     // Realtime: new website leads appear instantly
     sb.channel('leads-stream')
       .on('postgres_changes', { event:'*', schema:'public', table:'leads' }, loadLeads)
@@ -294,13 +295,10 @@ a{color:var(--blue)}
   }
 
   function renderStats() {
-    var weekAgo = Date.now() - 7*24*3600*1000;
     var n = leads.filter(l=>l.status==='New').length;
-    var week = leads.filter(l=> new Date(l.created_at).getTime() > weekAgo).length;
     var open = leads.filter(l=> l.status!=='Won' && l.status!=='Lost').length;
     var won = leads.filter(l=>l.status==='Won').length;
     document.getElementById('st-new').textContent=n;
-    document.getElementById('st-week').textContent=week;
     document.getElementById('st-open').textContent=open;
     document.getElementById('st-won').textContent=won;
     document.getElementById('st-total').textContent=leads.length;
@@ -374,6 +372,15 @@ a{color:var(--blue)}
 
   function openModal(l) {
     modal.classList.remove('wide');
+    buildCustomers();
+    var _cust=customers.find(function(c){ return c.lead && String(c.lead.id)===String(l.id); });
+    var quotesHtml='';
+    if(_cust && ((_cust.estRows&&_cust.estRows.length)||(_cust.insRows&&_cust.insRows.length))){
+      var _parts=[];
+      (_cust.estRows||[]).forEach(function(e){ var t=estTotals(e.items,e.tax_rate); _parts.push('<div class="est-row" style="cursor:default;padding:8px 10px"><div class="ec"><b>'+estNoFmt(e.estimate_no)+'</b><small>'+fmtDate(e.created_at)+'</small></div><div class="etotal" style="font-size:.9rem">'+money(t.total)+'</div><div class="ebtns"><a class="mini" href="'+estLink(e.id)+'" target="_blank">Open</a></div></div>'); });
+      (_cust.insRows||[]).forEach(function(e){ var t=insTotals(e.items,e.tax_rate,e.op_rate,e.depreciation,e.deductible); _parts.push('<div class="est-row" style="cursor:default;padding:8px 10px"><div class="ec"><b>'+insNoFmt(e.estimate_no)+'</b><small>'+fmtDate(e.created_at)+' · Insurance</small></div><div class="etotal" style="font-size:.9rem">'+money(t.rcv)+'</div><div class="ebtns"><a class="mini" href="'+insLink(e.id)+'" target="_blank">Open</a></div></div>'); });
+      quotesHtml='<div style="margin:2px 0 10px"><label style="font-size:.72rem;color:var(--slate);font-weight:700;text-transform:uppercase;letter-spacing:.06em">Estimates &amp; Insurance ('+_parts.length+')</label><div class="est-list" style="margin-top:4px">'+_parts.join('')+'</div></div>';
+    }
     modal.innerHTML =
       '<h3>'+esc(l.name)+'</h3>'+
       '<div class="fld"><label>Status</label><select id="m-status">'+
@@ -388,6 +395,7 @@ a{color:var(--blue)}
       '</div>'+
       '<div class="fld"><label>Their Message</label><textarea id="m-message">'+esc(l.message||'')+'</textarea></div>'+
       '<div class="fld"><label>Your Notes</label><textarea id="m-notes" placeholder="Follow-up notes, quote amount, next step…">'+esc(l.notes||'')+'</textarea></div>'+
+      quotesHtml+
       '<button class="btn" id="m-estimate" style="width:100%;background:var(--gold);color:#1a1a1a;margin-bottom:10px">＋ Create Estimate for this Customer</button>'+
       '<div class="modal-actions">'+
         '<button class="btn btn-danger" id="m-delete">Delete</button>'+
@@ -496,10 +504,11 @@ a{color:var(--blue)}
   function normPhone(p){ var d=(p||'').replace(/\D/g,''); if(d.length===11 && d[0]==='1') d=d.slice(1); return d.length>=7?d:''; }
   function normEmail(e){ return (e||'').toLowerCase().trim(); }
   function buildCustomers(){
-    // Collect every record from leads + estimates
+    // Collect every record from leads + estimates + insurance estimates
     var recs=[];
-    (leads||[]).forEach(function(l){ recs.push({name:l.name||'',phone:l.phone||'',pn:normPhone(l.phone),email:normEmail(l.email),city:l.city||'',service:l.service||'',date:l.created_at,isEst:false,estTotal:0}); });
-    (estimates||[]).forEach(function(e){ var t=estTotals(e.items,e.tax_rate); recs.push({name:e.customer_name||'',phone:e.customer_phone||'',pn:normPhone(e.customer_phone),email:normEmail(e.customer_email),city:'',service:'',date:e.created_at,isEst:true,estTotal:t.total,raw:e}); });
+    (leads||[]).forEach(function(l){ recs.push({type:'lead',name:l.name||'',phone:l.phone||'',pn:normPhone(l.phone),email:normEmail(l.email),city:l.city||'',service:l.service||'',date:l.created_at,isEst:false,estTotal:0,raw:l}); });
+    (estimates||[]).forEach(function(e){ var t=estTotals(e.items,e.tax_rate); recs.push({type:'est',name:e.customer_name||'',phone:e.customer_phone||'',pn:normPhone(e.customer_phone),email:normEmail(e.customer_email),city:'',service:'',date:e.created_at,isEst:true,estTotal:t.total,raw:e}); });
+    (insEstimates||[]).forEach(function(e){ var t=insTotals(e.items,e.tax_rate,e.op_rate,e.depreciation,e.deductible); recs.push({type:'ins',name:e.customer_name||'',phone:e.customer_phone||'',pn:normPhone(e.customer_phone),email:normEmail(e.customer_email),city:'',service:'',date:e.created_at,isEst:false,insTotal:t.rcv,raw:e}); });
     // Union-find: merge any records that share a phone OR an email (else fall back to name)
     var parent=recs.map(function(_,i){return i;});
     function find(i){ while(parent[i]!==i){ parent[i]=parent[parent[i]]; i=parent[i]; } return i; }
@@ -513,7 +522,7 @@ a{color:var(--blue)}
     var groups={};
     recs.forEach(function(r,i){ var g=find(i); (groups[g]=groups[g]||[]).push(r); });
     customers=Object.keys(groups).map(function(k){
-      var arr=groups[k], c={name:'',phone:'',email:'',city:'',service:'',lastDate:null,estCount:0,estTotal:0,estRows:[]};
+      var arr=groups[k], c={name:'',phone:'',email:'',city:'',service:'',lastDate:null,estCount:0,estTotal:0,estRows:[],insCount:0,insTotal:0,insRows:[],lead:null};
       arr.forEach(function(r){
         if(!c.name && r.name) c.name=r.name;
         if(!c.phone && r.phone) c.phone=r.phone;
@@ -521,16 +530,44 @@ a{color:var(--blue)}
         if(!c.city && r.city) c.city=r.city;
         if(!c.service && r.service) c.service=r.service;
         if(r.date && (!c.lastDate || new Date(r.date)>new Date(c.lastDate))) c.lastDate=r.date;
-        if(r.isEst){ c.estCount++; c.estTotal+=r.estTotal||0; if(r.raw) c.estRows.push(r.raw); }
+        if(r.type==='lead' && !c.lead) c.lead=r.raw;
+        if(r.type==='est'){ c.estCount++; c.estTotal+=r.estTotal||0; if(r.raw) c.estRows.push(r.raw); }
+        if(r.type==='ins'){ c.insCount++; c.insTotal+=r.insTotal||0; if(r.raw) c.insRows.push(r.raw); }
       });
       c.estRows.sort(function(a,b){ return new Date(b.created_at)-new Date(a.created_at); });
+      c.insRows.sort(function(a,b){ return new Date(b.created_at)-new Date(a.created_at); });
       return c;
     }).sort(function(a,b){ return new Date(b.lastDate||0)-new Date(a.lastDate||0); });
   }
+  // Give every estimate/insurance customer one lead profile (deduped — one per customer, not per estimate).
+  async function ensureLeadsFromCustomers(){
+    if(!sb) return false;
+    var lr=await sb.from('leads').select('*'); if(!lr.error) leads=lr.data||[];
+    var er=await sb.from('estimates').select('*'); if(!er.error) estimates=er.data||[];
+    var ir=await sb.from('insurance_estimates').select('*'); if(!ir.error) insEstimates=ir.data||[];
+    buildCustomers();
+    var toCreate=customers.filter(function(c){ return !c.lead && (c.estCount>0 || c.insCount>0) && (c.name||c.phone||c.email); });
+    if(!toCreate.length) return false;
+    var rows=toCreate.map(function(c){ return { name:c.name||'(no name)', phone:c.phone||null, email:c.email||null, service:c.service||(c.insCount>0?'Insurance claim':null), status:'Quoted', source:'estimate' }; });
+    var res=await sb.from('leads').insert(rows);
+    if(res.error){ console.error('ensureLeads', res.error); return false; }
+    return true;
+  }
+  // Targeted: ensure a single customer has a lead after a new estimate is saved.
+  async function ensureLeadForOne(info){
+    if(!sb) return;
+    var pn=normPhone(info.phone), em=normEmail(info.email), nm=(info.name||'').toLowerCase().trim();
+    var lr=await sb.from('leads').select('id,name,phone,email'); var ls=lr.error?[]:(lr.data||[]);
+    var match=ls.some(function(l){ var lp=normPhone(l.phone), le=normEmail(l.email); if(pn&&lp===pn) return true; if(em&&le===em) return true; if(!pn&&!em&&nm&&(l.name||'').toLowerCase().trim()===nm) return true; return false; });
+    if(match) return;
+    await sb.from('leads').insert([{ name:info.name||'(no name)', phone:info.phone||null, email:info.email||null, service:info.service||null, status:'Quoted', source:'estimate' }]);
+  }
+
   async function loadCustomers(){
     if(!sb) return;
     var er=await sb.from('estimates').select('*'); if(!er.error) estimates=er.data||[];
     var lr=await sb.from('leads').select('*'); if(!lr.error) leads=lr.data||[];
+    var ir=await sb.from('insurance_estimates').select('*'); if(!ir.error) insEstimates=ir.data||[];
     await loadPayments();
     buildCustomers(); renderCustomers();
   }
@@ -912,6 +949,7 @@ a{color:var(--blue)}
         var res=await sb.from('insurance_estimates').insert([fields]).select();
         btn.disabled=false; btn.textContent='Create & Get Link';
         if(res.error){ alert('Could not save: '+res.error.message); return; }
+        ensureLeadForOne({name:fields.customer_name, phone:fields.customer_phone, email:fields.customer_email, service:'Insurance claim'});
         showInsuranceLink(res.data[0]);
       }
     });
@@ -1025,6 +1063,7 @@ a{color:var(--blue)}
         var res=await sb.from('estimates').insert([fields]).select();
         btn.disabled=false; btn.textContent='Create & Get Link';
         if(res.error){ alert('Could not save: '+res.error.message); return; }
+        ensureLeadForOne({name:fields.customer_name, phone:fields.customer_phone, email:fields.customer_email, service:null});
         showEstimateLink(res.data[0]);
       }
     });
