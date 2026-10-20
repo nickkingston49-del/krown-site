@@ -85,6 +85,7 @@ a{color:var(--blue)}
 .card .mini{flex:1;background:var(--soft);border:1px solid var(--line);border-radius:7px;padding:6px;font-size:.78rem;font-weight:600;color:var(--ink);text-align:center;text-decoration:none}
 .card .mini:hover{border-color:var(--blue);color:var(--blue)}
 .card .cdate{font-size:.72rem;color:#9aa3b2;font-weight:500}
+.card .csched{font-size:.79rem;color:#1b7a43;font-weight:600;margin-top:5px}
 
 .empty{max-width:1320px;margin:40px auto;text-align:center;color:var(--slate);padding:40px}
 .empty b{display:block;font-size:1.1rem;color:var(--ink);margin-bottom:6px}
@@ -174,6 +175,7 @@ a{color:var(--blue)}
     <button class="tab" id="tab-estimates">Estimates</button>
     <button class="tab" id="tab-insurance">Insurance</button>
     <button class="tab" id="tab-customers">Customers</button>
+    <button class="tab" id="tab-schedule">Schedule</button>
   </div>
 
   <div id="view-pipeline">
@@ -215,6 +217,20 @@ a{color:var(--blue)}
       <input class="search" id="custSearch" placeholder="Search customers by name, phone, email, city…">
     </div>
     <div class="est-list" id="custList"></div>
+  </div>
+
+  <div id="view-schedule" hidden>
+    <div class="toolbar" style="justify-content:space-between;align-items:center">
+      <b style="font-size:1.05rem">Schedule</b>
+      <a class="icon-btn" href="https://calendar.google.com/calendar/r" target="_blank" rel="noopener" style="text-decoration:none">Open Google Calendar ↗</a>
+    </div>
+    <div class="est-list" id="upcomingJobs"></div>
+    <div style="max-width:1320px;margin:14px auto 60px;padding:0 22px">
+      <iframe id="gcalFrame" title="Google Calendar"
+        src="https://calendar.google.com/calendar/embed?src=nickkingston%40krown-construction.com&ctz=America%2FChicago&mode=AGENDA&showTitle=0&showPrint=0&showCalendars=0"
+        style="width:100%;height:600px;border:1px solid var(--line);border-radius:12px;background:#fff" frameborder="0" scrolling="no"></iframe>
+      <div style="font-size:.78rem;color:var(--slate);margin-top:8px">If the calendar above is blank, make sure you're signed in to your Google account (nickkingston@krown-construction.com) in this browser, or use “Open Google Calendar” above.</div>
+    </div>
   </div>
 </div>
 
@@ -313,6 +329,17 @@ a{color:var(--blue)}
 
   function fmtDate(iso){ var d=new Date(iso); return d.toLocaleDateString(undefined,{month:'short',day:'numeric'})+' · '+d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}); }
   function esc(s){ return (s||'').replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  // ---- Scheduling / Google Calendar helpers ----
+  function schedFmt(iso){ var d=new Date(iso); if(isNaN(d)) return ''; return d.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'})+', '+d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}); }
+  function toLocalInput(iso){ if(!iso) return ''; var d=new Date(iso); if(isNaN(d)) return ''; var p=function(n){return String(n).padStart(2,'0');}; return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes()); }
+  function gcalStamp(d){ var p=function(n){return String(n).padStart(2,'0');}; return d.getUTCFullYear()+p(d.getUTCMonth()+1)+p(d.getUTCDate())+'T'+p(d.getUTCHours())+p(d.getUTCMinutes())+'00Z'; }
+  function gcalLink(title,start,end,details,location){
+    var u='https://calendar.google.com/calendar/render?action=TEMPLATE&text='+encodeURIComponent(title||'Job');
+    if(start&&end) u+='&dates='+gcalStamp(start)+'/'+gcalStamp(end);
+    if(details) u+='&details='+encodeURIComponent(details);
+    if(location) u+='&location='+encodeURIComponent(location);
+    return u;
+  }
 
   function renderBoard() {
     var board = document.getElementById('board');
@@ -338,6 +365,7 @@ a{color:var(--blue)}
     el.innerHTML =
       '<div class="cname">'+esc(l.name)+'<span class="cdate">'+fmtDate(l.created_at)+'</span></div>'+
       (l.service?'<div class="csvc">'+esc(l.service)+'</div>':'')+
+      (l.job_start?'<div class="csched">📅 '+schedFmt(l.job_start)+'</div>':'')+
       '<div class="cmeta">'+
         (l.phone?'<a href="tel:'+esc(l.phone)+'">📞 '+esc(l.phone)+'</a>':'')+
         (l.email?'<a href="mailto:'+esc(l.email)+'">✉️ '+esc(l.email)+'</a>':'')+
@@ -388,6 +416,13 @@ a{color:var(--blue)}
       '</div>'+
       '<div class="fld"><label>Their Message</label><textarea id="m-message">'+esc(l.message||'')+'</textarea></div>'+
       '<div class="fld"><label>Your Notes</label><textarea id="m-notes" placeholder="Follow-up notes, quote amount, next step…">'+esc(l.notes||'')+'</textarea></div>'+
+      '<div style="border-top:1px solid var(--line);margin:8px 0;padding-top:10px"><label style="font-size:.72rem;color:var(--slate);font-weight:700;text-transform:uppercase;letter-spacing:.06em">Schedule Job</label>'+
+        '<div class="row2" style="margin-top:6px">'+
+          '<div class="fld"><label>Start</label><input id="m-jobstart" type="datetime-local" value="'+toLocalInput(l.job_start)+'"></div>'+
+          '<div class="fld"><label>End</label><input id="m-jobend" type="datetime-local" value="'+toLocalInput(l.job_end)+'"></div>'+
+        '</div>'+
+        '<button class="btn" id="m-gcal" style="width:100%;background:#1a73e8;color:#fff;margin-top:6px">📅 Save &amp; Add to Google Calendar</button>'+
+      '</div>'+
       quotesHtml+
       '<button class="btn" id="m-estimate" style="width:100%;background:var(--gold);color:#1a1a1a;margin-bottom:10px">＋ Create Estimate for this Customer</button>'+
       '<div class="modal-actions">'+
@@ -398,7 +433,28 @@ a{color:var(--blue)}
     modalBg.classList.add('open');
     document.getElementById('m-estimate').addEventListener('click', function(){ openEstimateModal(l); });
     document.getElementById('m-cancel').addEventListener('click', function(){ modalBg.classList.remove('open'); });
+    function jobFields(){
+      var js=document.getElementById('m-jobstart').value, je=document.getElementById('m-jobend').value;
+      return { job_start: js? new Date(js).toISOString() : null, job_end: je? new Date(je).toISOString() : null };
+    }
+    document.getElementById('m-gcal').addEventListener('click', async function(){
+      var js=document.getElementById('m-jobstart').value;
+      if(!js){ alert('Pick a start date and time first.'); return; }
+      var s=new Date(js), eVal=document.getElementById('m-jobend').value;
+      var e=eVal?new Date(eVal):new Date(s.getTime()+2*3600*1000);
+      var self=this; self.disabled=true; self.textContent='Saving…';
+      await sb.from('leads').update({ job_start:s.toISOString(), job_end:e.toISOString() }).eq('id', l.id);
+      l.job_start=s.toISOString(); l.job_end=e.toISOString();
+      self.disabled=false; self.textContent='📅 Save & Add to Google Calendar';
+      var svc=document.getElementById('m-service').value.trim();
+      var title='Job: '+l.name+(svc?' – '+svc:'');
+      var details='Customer: '+l.name+'\\nPhone: '+(document.getElementById('m-phone').value.trim()||'-')+(document.getElementById('m-email').value.trim()?'\\nEmail: '+document.getElementById('m-email').value.trim():'')+'\\nScheduled from Krown CRM';
+      var loc=document.getElementById('m-city').value.trim();
+      window.open(gcalLink(title,s,e,details,loc),'_blank');
+      renderStats(); renderBoard();
+    });
     document.getElementById('m-save').addEventListener('click', async function(){
+      var jf=jobFields();
       var upd = {
         status:document.getElementById('m-status').value,
         phone:document.getElementById('m-phone').value.trim(),
@@ -406,7 +462,8 @@ a{color:var(--blue)}
         service:document.getElementById('m-service').value.trim()||null,
         city:document.getElementById('m-city').value.trim()||null,
         message:document.getElementById('m-message').value.trim()||null,
-        notes:document.getElementById('m-notes').value.trim()||null
+        notes:document.getElementById('m-notes').value.trim()||null,
+        job_start:jf.job_start, job_end:jf.job_end
       };
       await sb.from('leads').update(upd).eq('id', l.id);
       modalBg.classList.remove('open'); loadLeads();
@@ -473,23 +530,51 @@ a{color:var(--blue)}
     rate=Number(rate)||0; var tax=sub*rate/100; return {sub:sub, tax:tax, rate:rate, total:sub+tax};
   }
 
-  var tabPipeline=document.getElementById('tab-pipeline'), tabEstimates=document.getElementById('tab-estimates'), tabCustomers=document.getElementById('tab-customers'), tabInsurance=document.getElementById('tab-insurance');
+  var tabPipeline=document.getElementById('tab-pipeline'), tabEstimates=document.getElementById('tab-estimates'), tabCustomers=document.getElementById('tab-customers'), tabInsurance=document.getElementById('tab-insurance'), tabSchedule=document.getElementById('tab-schedule');
   tabPipeline.addEventListener('click', function(){ switchView('pipeline'); });
   tabEstimates.addEventListener('click', function(){ switchView('estimates'); });
   tabCustomers.addEventListener('click', function(){ switchView('customers'); });
   tabInsurance.addEventListener('click', function(){ switchView('insurance'); });
+  tabSchedule.addEventListener('click', function(){ switchView('schedule'); });
   function switchView(v){
     document.getElementById('view-pipeline').hidden = v!=='pipeline';
     document.getElementById('view-estimates').hidden = v!=='estimates';
     document.getElementById('view-customers').hidden = v!=='customers';
     document.getElementById('view-insurance').hidden = v!=='insurance';
+    document.getElementById('view-schedule').hidden = v!=='schedule';
     tabPipeline.classList.toggle('active', v==='pipeline');
     tabEstimates.classList.toggle('active', v==='estimates');
     tabCustomers.classList.toggle('active', v==='customers');
     tabInsurance.classList.toggle('active', v==='insurance');
+    tabSchedule.classList.toggle('active', v==='schedule');
     if(v==='estimates') loadEstimates();
     if(v==='customers') loadCustomers();
     if(v==='insurance') loadInsurance();
+    if(v==='schedule') renderSchedule();
+  }
+
+  function renderSchedule(){
+    var wrap=document.getElementById('upcomingJobs');
+    var jobs=(leads||[]).filter(function(l){ return l.job_start; }).sort(function(a,b){ return new Date(a.job_start)-new Date(b.job_start); });
+    if(!jobs.length){ wrap.innerHTML='<div class="empty"><b>No jobs scheduled yet</b>Open a lead, set a job start time, and hit “Save &amp; Add to Google Calendar.”</div>'; return; }
+    var cutoff=Date.now()-18*3600*1000;
+    var show=jobs.filter(function(l){ return new Date(l.job_start).getTime()>=cutoff; });
+    if(!show.length) show=jobs.slice(-5);
+    wrap.innerHTML='<div style="font-size:.74rem;color:var(--slate);font-weight:700;letter-spacing:.06em;margin:2px 2px 8px">UPCOMING JOBS ('+show.length+')</div>';
+    show.forEach(function(l){
+      var s=new Date(l.job_start), e=l.job_end?new Date(l.job_end):new Date(s.getTime()+2*3600*1000);
+      var svc=l.service||'';
+      var link=gcalLink('Job: '+l.name+(svc?' – '+svc:''), s, e, 'Customer: '+l.name+'\nPhone: '+(l.phone||'-')+'\nScheduled from Krown CRM', l.city||'');
+      var row=document.createElement('div'); row.className='est-row';
+      row.innerHTML=
+        '<div class="ec"><b>'+esc(l.name)+'</b><small>'+schedFmt(l.job_start)+(svc?' · '+esc(svc):'')+(l.city?' · '+esc(l.city):'')+'</small></div>'+
+        '<div class="ebtns">'+
+          '<a class="mini" href="'+link+'" target="_blank" rel="noopener">📅 Add</a>'+
+          '<button class="mini" data-open>Open</button>'+
+        '</div>';
+      row.querySelector('[data-open]').addEventListener('click', function(){ openModal(l); });
+      wrap.appendChild(row);
+    });
   }
 
   // ---- Customers (auto-built from leads + estimates) ----
