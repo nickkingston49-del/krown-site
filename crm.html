@@ -63,17 +63,18 @@ a{color:var(--blue)}
 .search{flex:1;min-width:200px;padding:10px 14px;border:1.5px solid var(--line);border-radius:10px;background:#fff;font-size:.95rem}
 .search:focus{outline:none;border-color:var(--blue)}
 
-.board{max-width:1320px;margin:0 auto;padding:6px 22px 60px;display:grid;grid-template-columns:repeat(5,1fr);gap:14px;align-items:start}
-.col{background:#fff;border:1px solid var(--line);border-radius:var(--radius);min-height:120px}
-.col-head{padding:13px 15px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0}
-.col-head .dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:8px}
-.col-head b{font-size:.9rem}
-.col-head .count{background:var(--soft);border-radius:20px;padding:2px 9px;font-size:.78rem;font-weight:700;color:var(--slate)}
-.col-body{padding:12px;display:flex;flex-direction:column;gap:11px;min-height:60px}
-.col.drag-over{outline:2px dashed var(--blue);outline-offset:-4px}
+.board{display:block}
+.stage-tabs{max-width:1320px;margin:0 auto;padding:6px 22px 0;display:flex;flex-wrap:wrap;gap:8px}
+.stage-btn{display:flex;align-items:center;gap:8px;background:#fff;border:1.5px solid var(--line);border-radius:999px;padding:9px 16px;font-size:.88rem;font-weight:600;color:var(--ink);cursor:pointer}
+.stage-btn .dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+.stage-btn .cnt{background:var(--soft);border-radius:20px;padding:1px 9px;font-size:.76rem;font-weight:700;color:var(--slate)}
+.stage-btn:hover{border-color:var(--blue)}
+.stage-btn.active{border-color:var(--blue);background:var(--blue);color:#fff}
+.stage-btn.active .cnt{background:rgba(255,255,255,.25);color:#fff}
+.stage-panel{max-width:1320px;margin:0 auto;padding:14px 22px 60px;display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px;align-items:start}
+.stage-empty{max-width:1320px;margin:0 auto;padding:36px 22px;text-align:center;color:var(--slate)}
 
-.card{background:#fff;border:1px solid var(--line);border-radius:11px;padding:13px 14px;box-shadow:0 2px 8px rgba(16,29,73,.05);cursor:grab}
-.card:active{cursor:grabbing}
+.card{background:#fff;border:1px solid var(--line);border-radius:11px;padding:13px 14px;box-shadow:0 2px 8px rgba(16,29,73,.05)}
 .card .cname{font-weight:700;font-size:.97rem;display:flex;justify-content:space-between;gap:8px;align-items:center}
 .card .csvc{font-size:.82rem;color:var(--blue);font-weight:600;margin-top:2px}
 .card .cmeta{font-size:.8rem;color:var(--slate);margin-top:7px;display:flex;flex-direction:column;gap:3px}
@@ -100,7 +101,7 @@ a{color:var(--blue)}
 .btn-danger{background:#fdeaea;color:#c0392b;border:1px solid #f5c6c6}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 
-@media(max-width:1100px){.stats{grid-template-columns:repeat(2,1fr)}.board{grid-template-columns:1fr;}.col{margin-bottom:4px}}
+@media(max-width:1100px){.stats{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:560px){.topbar .brand b{display:none}}
 
 /* ---- Estimates ---- */
@@ -230,7 +231,7 @@ a{color:var(--blue)}
   var COLORS = {New:'var(--new)',Contacted:'var(--contacted)',Quoted:'var(--quoted)',Won:'var(--won)',Lost:'var(--lost)'};
   var loginMsg = document.getElementById('loginMsg');
   var setupHint = document.getElementById('setupHint');
-  var sb = null, leads = [], filterText = '';
+  var sb = null, leads = [], filterText = '', currentStage = 'New';
 
   // Guard: Supabase must be configured
   if (!window.KROWN_READY || !window.supabase) {
@@ -315,32 +316,25 @@ a{color:var(--blue)}
 
   function renderBoard() {
     var board = document.getElementById('board');
-    board.innerHTML='';
-    STAGES.forEach(function(stage){
-      var items = leads.filter(l=> l.status===stage && matches(l));
-      var col = document.createElement('div');
-      col.className='col'; col.setAttribute('data-stage',stage);
-      col.innerHTML =
-        '<div class="col-head"><span><span class="dot" style="background:'+COLORS[stage]+'"></span><b>'+stage+'</b></span><span class="count">'+items.length+'</span></div>'+
-        '<div class="col-body" data-stage="'+stage+'"></div>';
-      board.appendChild(col);
-      var body = col.querySelector('.col-body');
-      items.forEach(function(l){ body.appendChild(card(l)); });
-
-      // drag targets
-      col.addEventListener('dragover', function(e){ e.preventDefault(); col.classList.add('drag-over'); });
-      col.addEventListener('dragleave', function(){ col.classList.remove('drag-over'); });
-      col.addEventListener('drop', function(e){
-        e.preventDefault(); col.classList.remove('drag-over');
-        var id=e.dataTransfer.getData('text/plain');
-        setStatus(id, stage);
-      });
+    var counts = {}; STAGES.forEach(function(s){ counts[s] = leads.filter(function(l){ return l.status===s; }).length; });
+    if (STAGES.indexOf(currentStage) < 0) currentStage = 'New';
+    var tabs = '<div class="stage-tabs">' + STAGES.map(function(s){
+      return '<button class="stage-btn'+(s===currentStage?' active':'')+'" data-stage="'+s+'">'+
+        '<span class="dot" style="background:'+COLORS[s]+'"></span>'+s+
+        '<span class="cnt">'+counts[s]+'</span></button>';
+    }).join('') + '</div>';
+    var items = leads.filter(function(l){ return l.status===currentStage && matches(l); });
+    board.innerHTML = tabs + (items.length ? '<div class="stage-panel" id="stagePanel"></div>'
+      : '<div class="stage-empty">No leads in <b>'+currentStage+'</b>'+(filterText?' matching “'+esc(filterText)+'”':'')+'.</div>');
+    board.querySelectorAll('.stage-btn').forEach(function(b){
+      b.addEventListener('click', function(){ currentStage = this.getAttribute('data-stage'); renderBoard(); });
     });
+    if (items.length) { var p = document.getElementById('stagePanel'); items.forEach(function(l){ p.appendChild(card(l)); }); }
   }
 
   function card(l) {
     var el = document.createElement('div');
-    el.className='card'; el.draggable=true;
+    el.className='card';
     el.innerHTML =
       '<div class="cname">'+esc(l.name)+'<span class="cdate">'+fmtDate(l.created_at)+'</span></div>'+
       (l.service?'<div class="csvc">'+esc(l.service)+'</div>':'')+
@@ -354,7 +348,6 @@ a{color:var(--blue)}
         (l.phone?'<a class="mini" href="tel:'+esc(l.phone)+'">Call</a>':'')+
         '<button class="mini" data-act="open">Details</button>'+
       '</div>';
-    el.addEventListener('dragstart', function(e){ e.dataTransfer.setData('text/plain', l.id); });
     el.querySelector('[data-act="open"]').addEventListener('click', function(){ openModal(l); });
     return el;
   }
