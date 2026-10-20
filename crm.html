@@ -448,7 +448,7 @@ a{color:var(--blue)}
       self.disabled=false; self.textContent='📅 Save & Add to Google Calendar';
       var svc=document.getElementById('m-service').value.trim();
       var title='Job: '+l.name+(svc?' – '+svc:'');
-      var details='Customer: '+l.name+'\\nPhone: '+(document.getElementById('m-phone').value.trim()||'-')+(document.getElementById('m-email').value.trim()?'\\nEmail: '+document.getElementById('m-email').value.trim():'')+'\\nScheduled from Krown CRM';
+      var details='Customer: '+l.name+'\nPhone: '+(document.getElementById('m-phone').value.trim()||'-')+(document.getElementById('m-email').value.trim()?'\nEmail: '+document.getElementById('m-email').value.trim():'')+'\nScheduled from Krown CRM';
       var loc=document.getElementById('m-city').value.trim();
       window.open(gcalLink(title,s,e,details,loc),'_blank');
       renderStats(); renderBoard();
