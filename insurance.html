@@ -100,6 +100,11 @@
           <div class="row" id="taxRow" style="display:none"><span id="taxLabel">Sales tax (materials)</span><span id="taxAmt"></span></div>
           <div class="row" id="opRow" style="display:none"><span id="opLabel">Overhead &amp; Profit</span><span id="opAmt"></span></div>
           <div class="row total"><span>Replacement Cost (RCV)</span><span id="rcv"></span></div>
+          <div class="row" id="depRow" style="display:none"><span>Less: Recoverable Depreciation</span><span id="depAmt"></span></div>
+          <div class="row" id="acvRow" style="display:none"><span>Actual Cash Value (ACV)</span><span id="acvAmt"></span></div>
+          <div class="row" id="deductRow" style="display:none"><span>Less: Deductible</span><span id="deductAmt"></span></div>
+          <div class="row total" id="netRow" style="display:none;font-size:1.05rem"><span>Net ACV Payment (first check)</span><span id="netAmt"></span></div>
+          <div class="row" id="claimRow" style="display:none"><span>Total Claim Value (once depreciation released)</span><span id="claimAmt"></span></div>
         </div>
 
         <div class="in-notes" id="notesBlock" hidden></div>
@@ -126,12 +131,13 @@
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function fmtDate(s) { if (!s) return ''; var d = new Date(s.length <= 10 ? s + 'T00:00:00' : s); return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }); }
 
-  function totals(items, taxRate, opRate) {
+  function totals(items, taxRate, opRate, dep, deduct) {
     var mat = 0, lab = 0;
     (Array.isArray(items) ? items : []).forEach(function (it) { var q = Number(it.qty) || 0; mat += q * (Number(it.mat_unit) || 0); lab += q * (Number(it.lab_unit) || 0); });
     var sub = mat + lab; taxRate = Number(taxRate) || 0; opRate = Number(opRate) || 0;
-    var tax = mat * taxRate / 100, op = sub * opRate / 100;
-    return { mat: mat, lab: lab, sub: sub, tax: tax, taxRate: taxRate, op: op, opRate: opRate, rcv: sub + tax + op };
+    var tax = mat * taxRate / 100, op = sub * opRate / 100, rcv = sub + tax + op;
+    dep = Number(dep) || 0; deduct = Number(deduct) || 0;
+    return { mat: mat, lab: lab, sub: sub, tax: tax, taxRate: taxRate, op: op, opRate: opRate, rcv: rcv, dep: dep, deduct: deduct, acv: rcv - dep, netACV: rcv - dep - deduct, totalClaim: rcv - deduct };
   }
 
   function gridRow(label, val) { return val ? ('<div class="f"><span>' + esc(label) + '</span>' + esc(val) + '</div>') : ''; }
@@ -173,7 +179,7 @@
     });
     $('itemsBody').innerHTML = rows || '<tr><td colspan="6" style="color:var(--slate)">No line items.</td></tr>';
 
-    var t = totals(items, e.tax_rate, e.op_rate);
+    var t = totals(items, e.tax_rate, e.op_rate, e.depreciation, e.deductible);
     $('matSub').textContent = money(t.mat);
     $('labSub').textContent = money(t.lab);
     $('subTot').textContent = money(t.sub);
@@ -182,6 +188,17 @@
     if (t.opRate > 0) { $('opLabel').textContent = 'Overhead & Profit (' + t.opRate + '%)'; $('opAmt').textContent = money(t.op); $('opRow').style.display = 'flex'; }
     else { $('opRow').style.display = 'none'; }
     $('rcv').textContent = money(t.rcv);
+
+    var hasSettle = t.dep > 0 || t.deduct > 0;
+    if (t.dep > 0) {
+      $('depAmt').textContent = '−' + money(t.dep); $('depRow').style.display = 'flex';
+      $('acvAmt').textContent = money(t.acv); $('acvRow').style.display = 'flex';
+      $('claimAmt').textContent = money(t.totalClaim); $('claimRow').style.display = 'flex';
+    } else { $('depRow').style.display = 'none'; $('acvRow').style.display = 'none'; $('claimRow').style.display = 'none'; }
+    if (t.deduct > 0) { $('deductAmt').textContent = '−' + money(t.deduct); $('deductRow').style.display = 'flex'; }
+    else { $('deductRow').style.display = 'none'; }
+    if (hasSettle) { $('netAmt').textContent = money(t.netACV); $('netRow').style.display = 'flex'; }
+    else { $('netRow').style.display = 'none'; }
 
     if (e.notes) { $('notesBlock').textContent = e.notes; $('notesBlock').hidden = false; }
     else { $('notesBlock').hidden = true; }
