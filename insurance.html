@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Insurance Estimate | Krown Roofing and Construction</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#2a47c7">
+<link rel="icon" type="image/png" href="assets/logo.webp">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  body{background:#eef1f8}
+  .in-topbar{background:#fff;border-bottom:1px solid var(--line);box-shadow:0 2px 12px rgba(27,42,107,.05)}
+  .in-topbar .wrap{display:flex;align-items:center;justify-content:space-between;padding:12px 22px;gap:14px}
+  .in-topbar img{height:46px;width:auto}
+  .in-topbar a.phone{font-weight:700;color:var(--blue);white-space:nowrap}
+  .in-shell{max-width:900px;margin:26px auto 60px;padding:0 18px}
+  .in-card{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
+  .in-head{background:linear-gradient(135deg,var(--blue),var(--blue-deep));color:#fff;padding:26px 28px}
+  .in-head h1{color:#fff;font-size:1.5rem;margin:0 0 4px}
+  .in-head .meta{color:rgba(255,255,255,.9);font-size:.95rem}
+  .in-body{padding:26px 28px}
+  .in-label{font-weight:700;color:var(--blue-ink);font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;margin:0 0 8px}
+  .in-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 26px;margin-bottom:24px}
+  .in-grid .f{font-size:.95rem;color:var(--ink);padding:4px 0;border-bottom:1px solid var(--line)}
+  .in-grid .f span{color:var(--slate);display:inline-block;min-width:130px}
+  table.in-items{width:100%;border-collapse:collapse;margin:4px 0}
+  table.in-items th{text-align:left;font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;color:var(--slate);border-bottom:2px solid var(--line);padding:8px 6px}
+  table.in-items td{padding:10px 6px;border-bottom:1px solid var(--line);color:var(--ink);font-size:.93rem;vertical-align:top}
+  table.in-items td.num,table.in-items th.num{text-align:right;white-space:nowrap}
+  table.in-items tr.cat td{background:var(--soft);font-weight:700;color:var(--blue-ink);font-size:.82rem;letter-spacing:.03em;text-transform:uppercase;padding:8px 6px}
+  table.in-items .rate{color:var(--slate);font-size:.78rem;margin-top:2px}
+  .in-totals{margin:18px 0 4px;margin-left:auto;width:min(360px,100%)}
+  .in-totals .row{display:flex;justify-content:space-between;padding:6px 6px;font-size:.96rem;color:var(--slate)}
+  .in-totals .row.total{border-top:2px solid var(--line);margin-top:4px;padding-top:12px;font-size:1.2rem;font-weight:800;color:var(--blue-ink)}
+  .in-notes{background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-top:20px;color:var(--slate);white-space:pre-wrap}
+  .in-actions{padding:22px 28px 28px;border-top:1px solid var(--line);display:flex;gap:14px}
+  .in-actions .btn{flex:1;justify-content:center}
+  .in-msg{max-width:760px;margin:60px auto;text-align:center;color:var(--slate);font-size:1.05rem}
+  .in-foot{text-align:center;color:var(--slate);font-size:.86rem;margin-top:22px}
+  @media print{
+    body{background:#fff}
+    .in-topbar,.in-actions,.in-foot{display:none!important}
+    .in-shell{margin:0;max-width:100%}
+    .in-card{border:none;box-shadow:none}
+    .in-head{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    table.in-items tr.cat td{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
+  @media(max-width:620px){ .in-grid{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+
+<div class="in-topbar">
+  <div class="wrap">
+    <a href="index.html" aria-label="Krown Roofing and Construction"><img src="assets/logo.webp" alt="Krown Roofing and Construction"></a>
+    <a class="phone" href="tel:+14097192053">(409) 719-2053</a>
+  </div>
+</div>
+
+<div class="in-shell">
+  <div id="loading" class="in-msg">Loading estimate…</div>
+  <div id="notfound" class="in-msg" hidden>Sorry, we couldn't find this estimate. Please check your link or call us at <a href="tel:+14097192053">(409) 719-2053</a>.</div>
+
+  <div id="estimate" hidden>
+    <div class="in-card">
+      <div class="in-head">
+        <h1>Insurance Estimate — Krown Roofing and Construction</h1>
+        <div class="meta" id="headMeta"></div>
+      </div>
+      <div class="in-body">
+        <p class="in-label">Claim Information</p>
+        <div class="in-grid" id="claimGrid"></div>
+
+        <p class="in-label">Property / Insured</p>
+        <div class="in-grid" id="custGrid"></div>
+
+        <p class="in-label">Scope of Work</p>
+        <table class="in-items">
+          <thead>
+            <tr>
+              <th>Description</th>
+              <th class="num">Qty</th>
+              <th>Unit</th>
+              <th class="num">Material</th>
+              <th class="num">Labor</th>
+              <th class="num">Total</th>
+            </tr>
+          </thead>
+          <tbody id="itemsBody"></tbody>
+        </table>
+
+        <div class="in-totals">
+          <div class="row"><span>Material subtotal</span><span id="matSub"></span></div>
+          <div class="row"><span>Labor subtotal</span><span id="labSub"></span></div>
+          <div class="row"><span>Subtotal</span><span id="subTot"></span></div>
+          <div class="row" id="taxRow" style="display:none"><span id="taxLabel">Sales tax (materials)</span><span id="taxAmt"></span></div>
+          <div class="row" id="opRow" style="display:none"><span id="opLabel">Overhead &amp; Profit</span><span id="opAmt"></span></div>
+          <div class="row total"><span>Replacement Cost (RCV)</span><span id="rcv"></span></div>
+        </div>
+
+        <div class="in-notes" id="notesBlock" hidden></div>
+      </div>
+      <div class="in-actions">
+        <a class="btn btn-gold" id="printBtn" href="javascript:void(0)">Print / Save as PDF</a>
+      </div>
+    </div>
+    <p class="in-foot">Prepared by Krown Roofing and Construction · (409) 719-2053</p>
+  </div>
+</div>
+
+<script src="assets/config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var id = new URLSearchParams(location.search).get('id');
+  var sb = (window.KROWN_READY && window.supabase)
+    ? window.supabase.createClient(KROWN_CONFIG.SUPABASE_URL, KROWN_CONFIG.SUPABASE_ANON_KEY)
+    : null;
+
+  function money(n) { n = Number(n) || 0; return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function fmtDate(s) { if (!s) return ''; var d = new Date(s.length <= 10 ? s + 'T00:00:00' : s); return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }); }
+
+  function totals(items, taxRate, opRate) {
+    var mat = 0, lab = 0;
+    (Array.isArray(items) ? items : []).forEach(function (it) { var q = Number(it.qty) || 0; mat += q * (Number(it.mat_unit) || 0); lab += q * (Number(it.lab_unit) || 0); });
+    var sub = mat + lab; taxRate = Number(taxRate) || 0; opRate = Number(opRate) || 0;
+    var tax = mat * taxRate / 100, op = sub * opRate / 100;
+    return { mat: mat, lab: lab, sub: sub, tax: tax, taxRate: taxRate, op: op, opRate: opRate, rcv: sub + tax + op };
+  }
+
+  function gridRow(label, val) { return val ? ('<div class="f"><span>' + esc(label) + '</span>' + esc(val) + '</div>') : ''; }
+
+  function render(e) {
+    var estNo = e.estimate_no ? 'INS-' + String(e.estimate_no).padStart(4, '0') : String(e.id).slice(0, 8).toUpperCase();
+    $('headMeta').textContent = estNo + ' · ' + fmtDate(e.created_at);
+
+    var claim = gridRow('Claim #', e.claim_number) + gridRow('Insurance Co.', e.insurer) +
+      gridRow('Adjuster', e.adjuster) + gridRow('Policy #', e.policy_number) +
+      gridRow('Date of Loss', e.date_of_loss ? fmtDate(e.date_of_loss) : '');
+    $('claimGrid').innerHTML = claim || '<div class="f" style="color:var(--slate)">No claim details provided.</div>';
+
+    var cust = gridRow('Insured', e.customer_name) + gridRow('Property', e.property_address) +
+      gridRow('Phone', e.customer_phone) + gridRow('Email', e.customer_email);
+    $('custGrid').innerHTML = cust;
+
+    var items = Array.isArray(e.items) ? e.items : [];
+    // group by category, preserving order of first appearance
+    var order = [], groups = {};
+    items.forEach(function (it) { var c = (it.category || 'General').trim() || 'General'; if (!groups[c]) { groups[c] = []; order.push(c); } groups[c].push(it); });
+    var rows = '';
+    order.forEach(function (cat) {
+      rows += '<tr class="cat"><td colspan="6">' + esc(cat) + '</td></tr>';
+      groups[cat].forEach(function (it) {
+        var q = Number(it.qty) || 0, mu = Number(it.mat_unit) || 0, lu = Number(it.lab_unit) || 0;
+        var matX = q * mu, labX = q * lu;
+        var rate = [];
+        if (mu) rate.push(money(mu) + ' mat');
+        if (lu) rate.push(money(lu) + ' labor');
+        var rateLine = rate.length ? '<div class="rate">@ ' + rate.join(' + ') + ' per ' + esc(it.unit || 'EA') + '</div>' : '';
+        rows += '<tr><td>' + esc(it.description || '') + rateLine + '</td>' +
+          '<td class="num">' + q + '</td>' +
+          '<td>' + esc(it.unit || 'EA') + '</td>' +
+          '<td class="num">' + money(matX) + '</td>' +
+          '<td class="num">' + money(labX) + '</td>' +
+          '<td class="num">' + money(matX + labX) + '</td></tr>';
+      });
+    });
+    $('itemsBody').innerHTML = rows || '<tr><td colspan="6" style="color:var(--slate)">No line items.</td></tr>';
+
+    var t = totals(items, e.tax_rate, e.op_rate);
+    $('matSub').textContent = money(t.mat);
+    $('labSub').textContent = money(t.lab);
+    $('subTot').textContent = money(t.sub);
+    if (t.taxRate > 0) { $('taxLabel').textContent = 'Sales tax, materials (' + t.taxRate + '%)'; $('taxAmt').textContent = money(t.tax); $('taxRow').style.display = 'flex'; }
+    else { $('taxRow').style.display = 'none'; }
+    if (t.opRate > 0) { $('opLabel').textContent = 'Overhead & Profit (' + t.opRate + '%)'; $('opAmt').textContent = money(t.op); $('opRow').style.display = 'flex'; }
+    else { $('opRow').style.display = 'none'; }
+    $('rcv').textContent = money(t.rcv);
+
+    if (e.notes) { $('notesBlock').textContent = e.notes; $('notesBlock').hidden = false; }
+    else { $('notesBlock').hidden = true; }
+
+    $('loading').hidden = true;
+    $('estimate').hidden = false;
+  }
+
+  async function load() {
+    if (!id || !sb) { $('loading').hidden = true; $('notfound').hidden = false; return; }
+    try {
+      var r = await sb.rpc('get_insurance', { p_id: id });
+      if (r.error) throw r.error;
+      var e = Array.isArray(r.data) ? r.data[0] : r.data;
+      if (!e) { $('loading').hidden = true; $('notfound').hidden = false; return; }
+      render(e);
+    } catch (err) {
+      $('loading').hidden = true; $('notfound').hidden = false;
+    }
+  }
+
+  $('printBtn').addEventListener('click', function () { window.print(); });
+  load();
+})();
+</script>
+</body>
+</html>

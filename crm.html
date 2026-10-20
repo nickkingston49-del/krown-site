@@ -124,6 +124,13 @@ a{color:var(--blue)}
 .li-row{display:grid;grid-template-columns:1fr 56px 82px 30px;gap:7px;margin-bottom:8px;align-items:center}
 .li-row input{padding:9px 8px;border:1.5px solid var(--line);border-radius:8px;font-size:.88rem;width:100%}
 .li-x{background:#fdeaea;border:1px solid #f5c6c6;color:#c0392b;border-radius:8px;padding:8px 0;font-size:.8rem}
+.ins-li{border:1.5px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px;background:#fafbfe}
+.ins-li .r1{display:grid;grid-template-columns:150px 1fr 30px;gap:7px;margin-bottom:7px}
+.ins-li .r2{display:grid;grid-template-columns:62px 70px 1fr 1fr;gap:7px;align-items:end}
+.ins-li input,.ins-li select{padding:8px;border:1.5px solid var(--line);border-radius:8px;font-size:.85rem;width:100%}
+.ins-li label{font-size:.68rem;color:var(--slate);font-weight:600;display:block;margin-bottom:2px}
+.ins-li .lt{text-align:right;font-size:.78rem;color:var(--slate);margin-top:6px}
+@media(max-width:560px){ .ins-li .r1{grid-template-columns:1fr 1fr 30px} .ins-li .r2{grid-template-columns:1fr 1fr} }
 .est-totline{display:flex;justify-content:space-between;padding:5px 2px;color:var(--slate)}
 .est-totline.grand{font-weight:800;color:var(--navy);font-size:1.1rem;border-top:2px solid var(--line);margin-top:6px;padding-top:10px}
 .linkbox{display:flex;gap:8px;margin-top:6px}
@@ -164,6 +171,7 @@ a{color:var(--blue)}
   <div class="tabs">
     <button class="tab active" id="tab-pipeline">Pipeline</button>
     <button class="tab" id="tab-estimates">Estimates</button>
+    <button class="tab" id="tab-insurance">Insurance</button>
     <button class="tab" id="tab-customers">Customers</button>
   </div>
 
@@ -189,6 +197,14 @@ a{color:var(--blue)}
       <button class="icon-btn" id="newEstBtn" style="background:var(--gold);color:#1a1a1a;border-color:var(--gold)">+ New Estimate</button>
     </div>
     <div class="est-list" id="estList"></div>
+  </div>
+
+  <div id="view-insurance" hidden>
+    <div class="toolbar" style="justify-content:space-between;align-items:center">
+      <b style="font-size:1.05rem">Insurance Estimates</b>
+      <button class="icon-btn" id="newInsBtn" style="background:var(--gold);color:#1a1a1a;border-color:var(--gold)">+ New Insurance Estimate</button>
+    </div>
+    <div class="est-list" id="insList"></div>
   </div>
 
   <div id="view-customers" hidden>
@@ -456,19 +472,23 @@ a{color:var(--blue)}
     rate=Number(rate)||0; var tax=sub*rate/100; return {sub:sub, tax:tax, rate:rate, total:sub+tax};
   }
 
-  var tabPipeline=document.getElementById('tab-pipeline'), tabEstimates=document.getElementById('tab-estimates'), tabCustomers=document.getElementById('tab-customers');
+  var tabPipeline=document.getElementById('tab-pipeline'), tabEstimates=document.getElementById('tab-estimates'), tabCustomers=document.getElementById('tab-customers'), tabInsurance=document.getElementById('tab-insurance');
   tabPipeline.addEventListener('click', function(){ switchView('pipeline'); });
   tabEstimates.addEventListener('click', function(){ switchView('estimates'); });
   tabCustomers.addEventListener('click', function(){ switchView('customers'); });
+  tabInsurance.addEventListener('click', function(){ switchView('insurance'); });
   function switchView(v){
     document.getElementById('view-pipeline').hidden = v!=='pipeline';
     document.getElementById('view-estimates').hidden = v!=='estimates';
     document.getElementById('view-customers').hidden = v!=='customers';
+    document.getElementById('view-insurance').hidden = v!=='insurance';
     tabPipeline.classList.toggle('active', v==='pipeline');
     tabEstimates.classList.toggle('active', v==='estimates');
     tabCustomers.classList.toggle('active', v==='customers');
+    tabInsurance.classList.toggle('active', v==='insurance');
     if(v==='estimates') loadEstimates();
     if(v==='customers') loadCustomers();
+    if(v==='insurance') loadInsurance();
   }
 
   // ---- Customers (auto-built from leads + estimates) ----
@@ -698,6 +718,199 @@ a{color:var(--blue)}
   }
 
   document.getElementById('newEstBtn').addEventListener('click', function(){ openEstimateModal(null); });
+
+  // ===== Insurance estimates (Xactimate-style material/labor split) =====
+  var insEstimates = [];
+  var INS_UNITS = ['EA','SQ','SF','LF','SY','BDL','HR','DAY','LS'];
+  var INS_CATS = ['Roofing','Gutters & Downspouts','Siding','Soffit & Fascia','Ventilation','Flashing','Windows','Debris Removal','Painting','General Conditions'];
+  function insLink(id){ return new URL('insurance.html?id='+id, location.href).href; }
+  function insNoFmt(n){ return n?('INS-'+String(n).padStart(4,'0')):'INS-—'; }
+  function insTotals(items, taxRate, opRate){
+    var mat=0, lab=0;
+    (items||[]).forEach(function(it){ var q=Number(it.qty)||0; mat+=q*(Number(it.mat_unit)||0); lab+=q*(Number(it.lab_unit)||0); });
+    var sub=mat+lab; taxRate=Number(taxRate)||0; opRate=Number(opRate)||0;
+    var tax=mat*taxRate/100, op=sub*opRate/100;
+    return {mat:mat, lab:lab, sub:sub, tax:tax, taxRate:taxRate, op:op, opRate:opRate, rcv:sub+tax+op};
+  }
+  async function loadInsurance(){
+    if(!sb) return;
+    var res=await sb.from('insurance_estimates').select('*').order('created_at',{ascending:false});
+    if(res.error){ console.error(res.error); return; }
+    insEstimates=res.data||[]; renderInsurance();
+  }
+  function renderInsurance(){
+    var wrap=document.getElementById('insList');
+    if(!insEstimates.length){ wrap.innerHTML='<div class="empty"><b>No insurance estimates yet</b>Click “+ New Insurance Estimate” to build a material/labor breakdown for an adjuster.</div>'; return; }
+    wrap.innerHTML='';
+    insEstimates.forEach(function(e){
+      var t=insTotals(e.items, e.tax_rate, e.op_rate);
+      var row=document.createElement('div'); row.className='est-row';
+      row.innerHTML=
+        '<div class="ec"><b>'+insNoFmt(e.estimate_no)+' · '+esc(e.customer_name)+'</b><small>'+fmtDate(e.created_at)+(e.claim_number?' · Claim '+esc(e.claim_number):'')+(e.insurer?' · '+esc(e.insurer):'')+'</small></div>'+
+        '<div class="etotal">'+money(t.rcv)+'<div style="font-size:.72rem;font-weight:600;color:var(--slate);margin-top:2px">RCV</div></div>'+
+        '<div class="ebtns">'+
+          '<button class="mini" data-act="edit">Edit</button>'+
+          '<button class="mini" data-act="copy">Copy Link</button>'+
+          '<a class="mini" href="'+insLink(e.id)+'" target="_blank">Open</a>'+
+          '<button class="mini danger" data-act="del">Delete</button>'+
+        '</div>';
+      row.querySelector('[data-act="edit"]').addEventListener('click', function(){ openInsuranceModal(e); });
+      row.querySelector('[data-act="copy"]').addEventListener('click', function(){
+        var link=insLink(e.id), self=this;
+        navigator.clipboard.writeText(link).then(function(){ self.textContent='Copied!'; setTimeout(function(){ self.textContent='Copy Link'; },1500); }, function(){ prompt('Copy this link:', link); });
+      });
+      row.querySelector('[data-act="del"]').addEventListener('click', async function(){
+        if(!confirm('Delete insurance estimate '+insNoFmt(e.estimate_no)+' for '+e.customer_name+'? This cannot be undone.')) return;
+        var self=this; self.textContent='Deleting…'; self.disabled=true;
+        var res=await sb.from('insurance_estimates').delete().eq('id', e.id);
+        if(res.error){ alert('Could not delete: '+res.error.message); self.textContent='Delete'; self.disabled=false; return; }
+        loadInsurance();
+      });
+      wrap.appendChild(row);
+    });
+  }
+  document.getElementById('newInsBtn').addEventListener('click', function(){ openInsuranceModal(null); });
+
+  function openInsuranceModal(ex){
+    var items=(ex && Array.isArray(ex.items) && ex.items.length)
+      ? ex.items.map(function(it){ return {category:it.category||'', description:it.description||'', qty:(it.qty!=null?it.qty:1), unit:it.unit||'EA', mat_unit:(it.mat_unit!=null?it.mat_unit:''), lab_unit:(it.lab_unit!=null?it.lab_unit:'')}; })
+      : [{category:'Roofing', description:'', qty:1, unit:'SQ', mat_unit:'', lab_unit:''}];
+    modal.classList.add('wide');
+    var g=function(k){ return ex&&ex[k]!=null?ex[k]:''; };
+    modal.innerHTML=
+      '<h3>'+(ex?'Edit Insurance Estimate '+insNoFmt(ex.estimate_no):'New Insurance Estimate')+'</h3>'+
+      '<div class="row2">'+
+        '<div class="fld"><label>Customer Name *</label><input id="i-name" value="'+esc(g('customer_name'))+'"></div>'+
+        '<div class="fld"><label>Phone</label><input id="i-phone" value="'+esc(g('customer_phone'))+'"></div>'+
+      '</div>'+
+      '<div class="row2">'+
+        '<div class="fld"><label>Email</label><input id="i-email" value="'+esc(g('customer_email'))+'"></div>'+
+        '<div class="fld"><label>Property Address</label><input id="i-address" value="'+esc(g('property_address'))+'"></div>'+
+      '</div>'+
+      '<div style="border-top:1px solid var(--line);margin:10px 0 8px;padding-top:10px;font-weight:700;color:var(--navy)">Claim Details</div>'+
+      '<div class="row2">'+
+        '<div class="fld"><label>Claim #</label><input id="i-claim" value="'+esc(g('claim_number'))+'"></div>'+
+        '<div class="fld"><label>Insurance Company</label><input id="i-insurer" value="'+esc(g('insurer'))+'"></div>'+
+      '</div>'+
+      '<div class="row2">'+
+        '<div class="fld"><label>Adjuster</label><input id="i-adjuster" value="'+esc(g('adjuster'))+'"></div>'+
+        '<div class="fld"><label>Policy #</label><input id="i-policy" value="'+esc(g('policy_number'))+'"></div>'+
+      '</div>'+
+      '<div class="row2">'+
+        '<div class="fld"><label>Date of Loss</label><input id="i-dol" type="date" value="'+esc(g('date_of_loss'))+'"></div>'+
+        '<div class="fld"></div>'+
+      '</div>'+
+      '<div style="border-top:1px solid var(--line);margin:10px 0 8px;padding-top:10px;font-weight:700;color:var(--navy)">Line Items</div>'+
+      '<datalist id="i-cats">'+INS_CATS.map(function(c){return '<option value="'+esc(c)+'">';}).join('')+'</datalist>'+
+      '<div id="i-items"></div>'+
+      '<button class="icon-btn" id="i-additem" type="button" style="margin-top:2px">+ Add line</button>'+
+      '<div class="row2" style="margin-top:12px">'+
+        '<div class="fld"><label>Sales Tax on materials (%)</label><input id="i-tax" type="number" step="0.01" value="'+(ex?(Number(ex.tax_rate)||0):0)+'"></div>'+
+        '<div class="fld"><label>Overhead &amp; Profit (O&amp;P) (%)</label><input id="i-op" type="number" step="0.01" value="'+(ex?(Number(ex.op_rate)||0):20)+'"></div>'+
+      '</div>'+
+      '<div id="i-tot" style="margin:8px 0"></div>'+
+      '<div class="fld"><label>Notes</label><textarea id="i-notes" placeholder="Scope notes, exclusions, conditions…">'+esc(g('notes'))+'</textarea></div>'+
+      '<div class="modal-actions">'+
+        '<button class="btn btn-ghost" id="i-cancel">Cancel</button>'+
+        '<button class="btn btn-primary" id="i-save" style="flex:1">'+(ex?'Save Changes':'Create &amp; Get Link')+'</button>'+
+      '</div>';
+    modalBg.classList.add('open');
+
+    var itemsWrap=document.getElementById('i-items');
+    function unitOpts(sel){ return INS_UNITS.map(function(u){ return '<option'+(u===sel?' selected':'')+'>'+u+'</option>'; }).join(''); }
+    function renderItems(){
+      itemsWrap.innerHTML='';
+      items.forEach(function(it,idx){
+        var q=Number(it.qty)||0, lt=q*((Number(it.mat_unit)||0)+(Number(it.lab_unit)||0));
+        var r=document.createElement('div'); r.className='ins-li';
+        r.innerHTML=
+          '<div class="r1">'+
+            '<div><label>Category</label><input list="i-cats" data-f="category" value="'+esc(it.category)+'" placeholder="Roofing"></div>'+
+            '<div><label>Description</label><input data-f="description" value="'+esc(it.description)+'" placeholder="Remove &amp; replace architectural shingles"></div>'+
+            '<div style="align-self:end"><button class="li-x" type="button" title="Remove">✕</button></div>'+
+          '</div>'+
+          '<div class="r2">'+
+            '<div><label>Qty</label><input type="number" min="0" step="0.01" data-f="qty" value="'+(it.qty!==''?it.qty:'')+'"></div>'+
+            '<div><label>Unit</label><select data-f="unit">'+unitOpts(it.unit)+'</select></div>'+
+            '<div><label>Material $ / unit</label><input type="number" min="0" step="0.01" data-f="mat_unit" value="'+(it.mat_unit!==''?it.mat_unit:'')+'"></div>'+
+            '<div><label>Labor $ / unit</label><input type="number" min="0" step="0.01" data-f="lab_unit" value="'+(it.lab_unit!==''?it.lab_unit:'')+'"></div>'+
+          '</div>'+
+          '<div class="lt">Line total: <b>'+money(lt)+'</b></div>';
+        r.querySelectorAll('[data-f]').forEach(function(inp){
+          inp.addEventListener('input', function(){ items[idx][inp.getAttribute('data-f')]=inp.value; recompute(); updateLineTotal(r, idx); });
+          inp.addEventListener('change', function(){ items[idx][inp.getAttribute('data-f')]=inp.value; recompute(); updateLineTotal(r, idx); });
+        });
+        r.querySelector('.li-x').addEventListener('click', function(){ items.splice(idx,1); if(!items.length) items.push({category:'',description:'',qty:1,unit:'EA',mat_unit:'',lab_unit:''}); renderItems(); recompute(); });
+        itemsWrap.appendChild(r);
+      });
+    }
+    function updateLineTotal(r, idx){ var it=items[idx]; var q=Number(it.qty)||0; var lt=q*((Number(it.mat_unit)||0)+(Number(it.lab_unit)||0)); r.querySelector('.lt').innerHTML='Line total: <b>'+money(lt)+'</b>'; }
+    function recompute(){
+      var t=insTotals(items, document.getElementById('i-tax').value, document.getElementById('i-op').value);
+      var h='<div class="est-totline"><span>Material subtotal</span><span>'+money(t.mat)+'</span></div>'+
+        '<div class="est-totline"><span>Labor subtotal</span><span>'+money(t.lab)+'</span></div>'+
+        '<div class="est-totline"><span>Subtotal</span><span>'+money(t.sub)+'</span></div>';
+      if(t.taxRate>0) h+='<div class="est-totline"><span>Sales tax on materials ('+t.taxRate+'%)</span><span>'+money(t.tax)+'</span></div>';
+      if(t.opRate>0) h+='<div class="est-totline"><span>Overhead &amp; Profit ('+t.opRate+'%)</span><span>'+money(t.op)+'</span></div>';
+      h+='<div class="est-totline grand"><span>Replacement Cost (RCV)</span><span>'+money(t.rcv)+'</span></div>';
+      document.getElementById('i-tot').innerHTML=h;
+    }
+    renderItems(); recompute();
+    document.getElementById('i-additem').addEventListener('click', function(){ items.push({category:'',description:'',qty:1,unit:'EA',mat_unit:'',lab_unit:''}); renderItems(); });
+    document.getElementById('i-tax').addEventListener('input', recompute);
+    document.getElementById('i-op').addEventListener('input', recompute);
+    document.getElementById('i-cancel').addEventListener('click', function(){ modal.classList.remove('wide'); modalBg.classList.remove('open'); });
+    document.getElementById('i-save').addEventListener('click', async function(){
+      var name=document.getElementById('i-name').value.trim();
+      if(!name){ alert('Customer name is required.'); return; }
+      var clean=items.filter(function(it){ return (it.description||'').trim()!=='' || Number(it.mat_unit)>0 || Number(it.lab_unit)>0; })
+        .map(function(it){ return {category:(it.category||'').trim(), description:(it.description||'').trim(), qty:Number(it.qty)||0, unit:it.unit||'EA', mat_unit:Number(it.mat_unit)||0, lab_unit:Number(it.lab_unit)||0}; });
+      if(!clean.length){ alert('Add at least one line item.'); return; }
+      var btn=document.getElementById('i-save'); btn.disabled=true; btn.textContent='Saving…';
+      var fields={
+        customer_name:name,
+        customer_phone:document.getElementById('i-phone').value.trim()||null,
+        customer_email:document.getElementById('i-email').value.trim()||null,
+        property_address:document.getElementById('i-address').value.trim()||null,
+        claim_number:document.getElementById('i-claim').value.trim()||null,
+        insurer:document.getElementById('i-insurer').value.trim()||null,
+        adjuster:document.getElementById('i-adjuster').value.trim()||null,
+        policy_number:document.getElementById('i-policy').value.trim()||null,
+        date_of_loss:document.getElementById('i-dol').value||null,
+        items:clean,
+        tax_rate:Number(document.getElementById('i-tax').value)||0,
+        op_rate:Number(document.getElementById('i-op').value)||0,
+        notes:document.getElementById('i-notes').value.trim()||null
+      };
+      if(ex){
+        var ur=await sb.from('insurance_estimates').update(fields).eq('id', ex.id);
+        btn.disabled=false; btn.textContent='Save Changes';
+        if(ur.error){ alert('Could not save: '+ur.error.message); return; }
+        modal.classList.remove('wide'); modalBg.classList.remove('open'); loadInsurance();
+      } else {
+        fields.status='Sent';
+        var res=await sb.from('insurance_estimates').insert([fields]).select();
+        btn.disabled=false; btn.textContent='Create & Get Link';
+        if(res.error){ alert('Could not save: '+res.error.message); return; }
+        showInsuranceLink(res.data[0]);
+      }
+    });
+  }
+
+  function showInsuranceLink(row){
+    var link=insLink(row.id);
+    modal.classList.remove('wide');
+    modal.innerHTML=
+      '<h3>Insurance Estimate Ready ✓</h3>'+
+      '<p style="color:var(--slate);margin-top:-6px">'+insNoFmt(row.estimate_no)+' for <b>'+esc(row.customer_name)+'</b>. Send this link to the adjuster or homeowner, or open it to print / save a PDF.</p>'+
+      '<div class="linkbox"><input id="ins-link" value="'+esc(link)+'" readonly style="flex:1;padding:10px;border:1.5px solid var(--line);border-radius:8px;font-size:.85rem"><button class="btn btn-primary" id="ins-copy">Copy</button></div>'+
+      '<div class="modal-actions" style="margin-top:14px">'+
+        '<a class="btn btn-ghost" href="'+link+'" target="_blank" style="flex:1;justify-content:center">Open / Print</a>'+
+        '<button class="btn btn-primary" id="ins-done" style="flex:1">Done</button>'+
+      '</div>';
+    document.getElementById('ins-copy').addEventListener('click', function(){ var self=this; navigator.clipboard.writeText(link).then(function(){ self.textContent='Copied!'; setTimeout(function(){ self.textContent='Copy'; },1500); }, function(){ document.getElementById('ins-link').select(); }); });
+    document.getElementById('ins-done').addEventListener('click', function(){ modalBg.classList.remove('open'); loadInsurance(); });
+  }
 
   function openEstimateModal(lead, editing){
     var pf = editing ? {name:editing.customer_name, phone:editing.customer_phone, email:editing.customer_email} : (lead||{});
