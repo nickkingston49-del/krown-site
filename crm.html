@@ -86,6 +86,7 @@ a{color:var(--blue)}
 .card .mini:hover{border-color:var(--blue);color:var(--blue)}
 .card .cdate{font-size:.72rem;color:#9aa3b2;font-weight:500}
 .card .csched{font-size:.79rem;color:#1b7a43;font-weight:600;margin-top:5px}
+.sortsel{padding:8px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:.85rem;background:#fff;color:var(--ink);font-weight:600}
 
 .empty{max-width:1320px;margin:40px auto;text-align:center;color:var(--slate);padding:40px}
 .empty b{display:block;font-size:1.1rem;color:var(--ink);margin-bottom:6px}
@@ -194,17 +195,23 @@ a{color:var(--blue)}
   </div>
 
   <div id="view-estimates" hidden>
-    <div class="toolbar" style="justify-content:space-between;align-items:center">
+    <div class="toolbar" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
       <b style="font-size:1.05rem">Estimates</b>
-      <button class="icon-btn" id="newEstBtn" style="background:var(--gold);color:#1a1a1a;border-color:var(--gold)">+ New Estimate</button>
+      <div style="display:flex;gap:10px;align-items:center">
+        <select id="estSort" class="sortsel"><option value="new">Newest first</option><option value="old">Oldest first</option><option value="name">Name (A–Z)</option></select>
+        <button class="icon-btn" id="newEstBtn" style="background:var(--gold);color:#1a1a1a;border-color:var(--gold)">+ New Estimate</button>
+      </div>
     </div>
     <div class="est-list" id="estList"></div>
   </div>
 
   <div id="view-insurance" hidden>
-    <div class="toolbar" style="justify-content:space-between;align-items:center">
+    <div class="toolbar" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
       <b style="font-size:1.05rem">Insurance Estimates</b>
-      <button class="icon-btn" id="newInsBtn" style="background:var(--gold);color:#1a1a1a;border-color:var(--gold)">+ New Insurance Estimate</button>
+      <div style="display:flex;gap:10px;align-items:center">
+        <select id="insSort" class="sortsel"><option value="new">Newest first</option><option value="old">Oldest first</option><option value="name">Name (A–Z)</option></select>
+        <button class="icon-btn" id="newInsBtn" style="background:var(--gold);color:#1a1a1a;border-color:var(--gold)">+ New Insurance Estimate</button>
+      </div>
     </div>
     <div class="est-list" id="insList"></div>
   </div>
@@ -243,8 +250,8 @@ a{color:var(--blue)}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 (function () {
-  var STAGES = ['New','Contacted','Quoted','Won','Lost'];
-  var COLORS = {New:'var(--new)',Contacted:'var(--contacted)',Quoted:'var(--quoted)',Won:'var(--won)',Lost:'var(--lost)'};
+  var STAGES = ['New','Quoted','Won','Lost'];
+  var COLORS = {New:'var(--new)',Quoted:'var(--quoted)',Won:'var(--won)',Lost:'var(--lost)'};
   var loginMsg = document.getElementById('loginMsg');
   var setupHint = document.getElementById('setupHint');
   var sb = null, leads = [], filterText = '', currentStage = 'New';
@@ -518,7 +525,14 @@ a{color:var(--blue)}
   });
 
   // ================= ESTIMATES =================
-  var estimates = [], estChannelSubscribed = false, payments = [];
+  var estimates = [], estChannelSubscribed = false, payments = [], estSort = 'new', insSort = 'new';
+  function sortRows(rows, mode, nameKey){
+    var a=rows.slice();
+    if(mode==='name') a.sort(function(x,y){ return (x[nameKey]||'').toLowerCase().localeCompare((y[nameKey]||'').toLowerCase()); });
+    else if(mode==='old') a.sort(function(x,y){ return new Date(x.created_at)-new Date(y.created_at); });
+    else a.sort(function(x,y){ return new Date(y.created_at)-new Date(x.created_at); });
+    return a;
+  }
 
   function estLink(id){ return new URL('estimate.html?id='+id, location.href).href; }
   function rcptLink(id){ return new URL('receipt.html?id='+id, location.href).href; }
@@ -675,43 +689,45 @@ a{color:var(--blue)}
   function openCustomerModal(c){
     modal.classList.remove('wide');
     var meta=[c.phone,c.email,c.city].filter(Boolean).map(esc).join(' · ');
-    var rowsHtml;
-    if(!c.estRows || !c.estRows.length){
-      rowsHtml='<p style="color:var(--slate)">No estimates for this customer yet.</p>';
-    } else {
-      rowsHtml=c.estRows.map(function(e){
-        var t=estTotals(e.items,e.tax_rate);
-        return '<div class="est-row" style="cursor:default">'+
-          '<div class="ec"><b>'+estNoFmt(e.estimate_no)+'</b><small>'+fmtDate(e.created_at)+'</small></div>'+
-          '<div class="etotal">'+money(t.total)+payChip(e,t)+'</div>'+
-          '<span class="est-status '+e.status+'">'+e.status+'</span>'+
-          '<div class="ebtns">'+
-            '<button class="mini" data-pay="'+e.id+'">$ Payments</button>'+
-            '<button class="mini" data-edit="'+e.id+'">Edit</button>'+
-            '<a class="mini" href="'+estLink(e.id)+'" target="_blank">Open</a>'+
-            '<button class="mini" data-copy="'+e.id+'">Copy Link</button>'+
-          '</div>'+
-        '</div>';
-      }).join('');
-    }
+    var ests=c.estRows||[], inss=c.insRows||[];
+    function estRowHtml(e){ var t=estTotals(e.items,e.tax_rate); return '<div class="est-row" style="cursor:default">'+
+      '<div class="ec"><b>'+estNoFmt(e.estimate_no)+'</b><small>'+fmtDate(e.created_at)+'</small></div>'+
+      '<div class="etotal">'+money(t.total)+payChip(e,t)+'</div>'+
+      '<span class="est-status '+e.status+'">'+e.status+'</span>'+
+      '<div class="ebtns">'+
+        '<button class="mini" data-pay="'+e.id+'">$ Payments</button>'+
+        '<button class="mini" data-edit="'+e.id+'">Edit</button>'+
+        '<a class="mini" href="'+estLink(e.id)+'" target="_blank">Open</a>'+
+        '<button class="mini" data-copy="'+e.id+'">Copy Link</button>'+
+      '</div></div>'; }
+    function insRowHtml(e){ var t=insTotals(e.items,e.tax_rate,e.op_rate,e.depreciation,e.deductible); return '<div class="est-row" style="cursor:default">'+
+      '<div class="ec"><b>'+insNoFmt(e.estimate_no)+'</b><small>'+fmtDate(e.created_at)+(e.claim_number?' · Claim '+esc(e.claim_number):'')+'</small></div>'+
+      '<div class="etotal">'+money(t.rcv)+'<div style="font-size:.7rem;color:var(--slate);font-weight:600">RCV</div></div>'+
+      '<div class="ebtns">'+
+        '<button class="mini" data-iedit="'+e.id+'">Edit</button>'+
+        '<a class="mini" href="'+insLink(e.id)+'" target="_blank">Open</a>'+
+        '<button class="mini" data-icopy="'+e.id+'">Copy Link</button>'+
+      '</div></div>'; }
     modal.innerHTML=
       '<h3>'+esc(c.name||'Customer')+'</h3>'+
       (meta?'<p style="color:var(--slate);margin-top:-6px">'+meta+'</p>':'')+
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin:10px 0 6px"><b>Estimates ('+(c.estRows?c.estRows.length:0)+')</b>'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin:10px 0 6px"><b>Estimates ('+ests.length+')</b>'+
         '<button class="icon-btn" id="cust-new" style="background:var(--gold);color:#1a1a1a;border-color:var(--gold)">+ New Estimate</button></div>'+
-      '<div class="est-list">'+rowsHtml+'</div>'+
-      '<div class="modal-actions"><button class="btn btn-ghost" id="cust-close" style="flex:1">Close</button></div>';
+      (ests.length?'<div class="est-list">'+ests.map(estRowHtml).join('')+'</div>':'<p style="color:var(--slate);margin:0 0 6px">None yet.</p>')+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 6px"><b>Insurance Estimates ('+inss.length+')</b>'+
+        '<button class="icon-btn" id="cust-newins" style="background:var(--gold);color:#1a1a1a;border-color:var(--gold)">+ New Insurance</button></div>'+
+      (inss.length?'<div class="est-list">'+inss.map(insRowHtml).join('')+'</div>':'<p style="color:var(--slate);margin:0">None yet.</p>')+
+      '<div class="modal-actions" style="margin-top:14px"><button class="btn btn-ghost" id="cust-close" style="flex:1">Close</button></div>';
     modalBg.classList.add('open');
     document.getElementById('cust-close').addEventListener('click', function(){ modalBg.classList.remove('open'); });
     document.getElementById('cust-new').addEventListener('click', function(){ openEstimateModal({name:c.name,phone:c.phone,email:c.email}); });
-    modal.querySelectorAll('[data-copy]').forEach(function(btn){
-      btn.addEventListener('click', function(){
-        var link=estLink(this.getAttribute('data-copy')), self=this;
-        navigator.clipboard.writeText(link).then(function(){ self.textContent='Copied!'; setTimeout(function(){ self.textContent='Copy Link'; },1500); }, function(){ prompt('Copy this link:', link); });
-      });
-    });
+    document.getElementById('cust-newins').addEventListener('click', function(){ openInsuranceModal(null); var set=function(id,v){ var el=document.getElementById(id); if(el&&v) el.value=v; }; set('i-name',c.name); set('i-phone',c.phone); set('i-email',c.email); set('i-address',c.city); });
+    modal.querySelectorAll('[data-copy]').forEach(function(btn){ btn.addEventListener('click', function(){ var link=estLink(this.getAttribute('data-copy')), self=this; navigator.clipboard.writeText(link).then(function(){ self.textContent='Copied!'; setTimeout(function(){ self.textContent='Copy Link'; },1500); }, function(){ prompt('Copy this link:', link); }); }); });
+    modal.querySelectorAll('[data-icopy]').forEach(function(btn){ btn.addEventListener('click', function(){ var link=insLink(this.getAttribute('data-icopy')), self=this; navigator.clipboard.writeText(link).then(function(){ self.textContent='Copied!'; setTimeout(function(){ self.textContent='Copy Link'; },1500); }, function(){ prompt('Copy this link:', link); }); }); });
     function estById(id){ return (c.estRows||[]).filter(function(x){return x.id===id;})[0]; }
+    function insById(id){ return (c.insRows||[]).filter(function(x){return x.id===id;})[0]; }
     modal.querySelectorAll('[data-edit]').forEach(function(btn){ btn.addEventListener('click', function(){ var e=estById(this.getAttribute('data-edit')); if(e) openEstimateModal(null, e); }); });
+    modal.querySelectorAll('[data-iedit]').forEach(function(btn){ btn.addEventListener('click', function(){ var e=insById(this.getAttribute('data-iedit')); if(e) openInsuranceModal(e); }); });
     modal.querySelectorAll('[data-pay]').forEach(function(btn){ btn.addEventListener('click', function(){ var e=estById(this.getAttribute('data-pay')); if(e) openPaymentsModal(e); }); });
   }
 
@@ -733,7 +749,7 @@ a{color:var(--blue)}
     var wrap=document.getElementById('estList');
     if(!estimates.length){ wrap.innerHTML='<div class="empty"><b>No estimates yet</b>Click “+ New Estimate,” or open a lead and hit “Create Estimate.”</div>'; return; }
     wrap.innerHTML='';
-    estimates.forEach(function(e){
+    sortRows(estimates, estSort, 'customer_name').forEach(function(e){
       var t=estTotals(e.items, e.tax_rate);
       var row=document.createElement('div'); row.className='est-row';
       row.innerHTML =
@@ -833,6 +849,7 @@ a{color:var(--blue)}
   }
 
   document.getElementById('newEstBtn').addEventListener('click', function(){ openEstimateModal(null); });
+  document.getElementById('estSort').addEventListener('change', function(){ estSort=this.value; renderEstimates(); });
 
   // ===== Insurance estimates (Xactimate-style material/labor split) =====
   var insEstimates = [];
@@ -859,7 +876,7 @@ a{color:var(--blue)}
     var wrap=document.getElementById('insList');
     if(!insEstimates.length){ wrap.innerHTML='<div class="empty"><b>No insurance estimates yet</b>Click “+ New Insurance Estimate” to build a material/labor breakdown for an adjuster.</div>'; return; }
     wrap.innerHTML='';
-    insEstimates.forEach(function(e){
+    sortRows(insEstimates, insSort, 'customer_name').forEach(function(e){
       var t=insTotals(e.items, e.tax_rate, e.op_rate);
       var row=document.createElement('div'); row.className='est-row';
       row.innerHTML=
@@ -887,6 +904,7 @@ a{color:var(--blue)}
     });
   }
   document.getElementById('newInsBtn').addEventListener('click', function(){ openInsuranceModal(null); });
+  document.getElementById('insSort').addEventListener('change', function(){ insSort=this.value; renderInsurance(); });
 
   function openInsuranceModal(ex){
     var items=(ex && Array.isArray(ex.items) && ex.items.length)
@@ -896,6 +914,7 @@ a{color:var(--blue)}
     var g=function(k){ return ex&&ex[k]!=null?ex[k]:''; };
     modal.innerHTML=
       '<h3>'+(ex?'Edit Insurance Estimate '+insNoFmt(ex.estimate_no):'New Insurance Estimate')+'</h3>'+
+      (ex?'':'<div class="fld"><label>Use a saved customer (optional)</label><input id="i-pick" list="i-custlist" placeholder="Start typing a name to autofill…" autocomplete="off"><datalist id="i-custlist"></datalist></div>')+
       '<div class="row2">'+
         '<div class="fld"><label>Customer Name *</label><input id="i-name" value="'+esc(g('customer_name'))+'"></div>'+
         '<div class="fld"><label>Phone</label><input id="i-phone" value="'+esc(g('customer_phone'))+'"></div>'+
@@ -937,6 +956,17 @@ a{color:var(--blue)}
         '<button class="btn btn-primary" id="i-save" style="flex:1">'+(ex?'Save Changes':'Create &amp; Get Link')+'</button>'+
       '</div>';
     modalBg.classList.add('open');
+
+    // Saved-customer autofill (same customer list as regular estimates)
+    buildCustomers();
+    var _byName={}; customers.forEach(function(c){ _byName[(c.name||'').toLowerCase().trim()]=c; });
+    var _dl=document.getElementById('i-custlist');
+    if(_dl) _dl.innerHTML=customers.map(function(c){ return '<option value="'+esc(c.name||'')+'">'; }).join('');
+    var _pick=document.getElementById('i-pick');
+    if(_pick) _pick.addEventListener('input', function(){
+      var c=_byName[this.value.toLowerCase().trim()];
+      if(c){ document.getElementById('i-name').value=c.name||''; document.getElementById('i-phone').value=c.phone||''; document.getElementById('i-email').value=c.email||''; if(!document.getElementById('i-address').value && c.city) document.getElementById('i-address').value=c.city; }
+    });
 
     var itemsWrap=document.getElementById('i-items');
     function unitOpts(sel){ return INS_UNITS.map(function(u){ return '<option'+(u===sel?' selected':'')+'>'+u+'</option>'; }).join(''); }
